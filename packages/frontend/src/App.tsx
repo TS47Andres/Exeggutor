@@ -221,7 +221,7 @@ function App() {
           <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center border border-dark-700 text-neon-blue mb-4">
             <Layout className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-slate-100 mb-2">Welcome to Omnishell Multiplexer</h2>
+          <h2 className="text-xl font-bold text-slate-100 mb-2">Welcome to Exeggutor</h2>
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
             A subscription-free, local-first workspace coordinator. Register your project directory path to get started.
           </p>
@@ -280,11 +280,11 @@ function App() {
       <header className="h-16 border-b border-neon-blue/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-tr from-neon-blue to-neon-green rounded-lg flex items-center justify-center text-white shadow-lg shadow-neon-blue/20">
-            <Terminal className="w-5 h-5 text-white" />
+            <Terminal className="w-5 h-5 text-dark-900" />
           </div>
           <div className="flex flex-col">
             <h1 className="text-sm font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
-              OMNISHELL MULTIPLEXER
+              EXEGGUTOR
             </h1>
             <span className="text-[10px] text-neon-blue font-bold tracking-widest uppercase">Local-First</span>
           </div>

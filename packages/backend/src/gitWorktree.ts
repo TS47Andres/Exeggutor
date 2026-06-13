@@ -106,7 +106,28 @@ export async function createBranch(repoPath: string, branchName: string): Promis
 
 // Opens a native folder selection dialog on Windows and returns the selected path.
 export async function showFolderPicker(): Promise<string> {
-  const cmd = `powershell -Command "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $g = New-Object System.Windows.Forms.FolderBrowserDialog; $g.Description = 'Select Workspace Root Directory'; $g.ShowNewFolderButton = $true; $r = $g.ShowDialog(); if ($r -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $g.SelectedPath }"`; // PowerShell command to invoke FolderBrowserDialog.
+  const script = [
+    "Add-Type -AssemblyName System.Windows.Forms;",
+    "$f = New-Object System.Windows.Forms.OpenFileDialog;",
+    "$f.Filter = 'Folders|*';",
+    "$f.CheckFileExists = $false;",
+    "$f.CheckPathExists = $true;",
+    "$f.DereferenceLinks = $true;",
+    "$f.Multiselect = $false;",
+    "$f.Title = 'Select Workspace Folder';",
+    "$type = $f.GetType();",
+    "$vista = $type.GetMethod('CreateVistaDialog', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $null);",
+    "$type.GetMethod('OnBeforeVistaDialog', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $vista);",
+    "$opt = [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+FOS').GetField('FOS_PICKFOLDERS').GetValue($null);",
+    "$opts = $type.GetMethod('get_Options', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $null) -bor $opt;",
+    "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+IFileDialog').GetMethod('SetOptions', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, $opts);",
+    "if ($type.GetMethod('Show', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, [IntPtr]::Zero) -eq 0) {",
+    "  $res = [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+IFileDialog').GetMethod('GetResult', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, $null);",
+    "  $path = $res.GetType().GetMethod('GetDisplayName', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($res, 0x80058000);",
+    "  Write-Output $path;",
+    "}"
+  ].join(' '); // Condensed single-line PowerShell commands block.
+  const cmd = "powershell -Command \"" + script.replace(/\$/g, '`$') + "\""; // Full PowerShell command line with escaped variables.
   const result = await execAsync(cmd, process.cwd()); // Executed command stdout output.
   return result;
 }
