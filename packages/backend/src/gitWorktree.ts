@@ -93,3 +93,20 @@ export async function removeGitWorktree(repoPath: string, worktreePath: string):
   }
   await execAsync('git worktree prune', resolvedRepo);
 }
+
+// Creates a new Git branch in the specified repository.
+export async function createBranch(repoPath: string, branchName: string): Promise<void> {
+  const resolvedRepo = path.resolve(repoPath); // Resolved absolute repository path.
+  const isGit = await isGitRepository(resolvedRepo); // Verification flag.
+  if (!isGit) {
+    throw new Error('Target folder is not a valid Git repository');
+  }
+  await execAsync(`git branch "${branchName}"`, resolvedRepo);
+}
+
+// Opens a native folder selection dialog on Windows and returns the selected path.
+export async function showFolderPicker(): Promise<string> {
+  const cmd = `powershell -Command "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; $g = New-Object System.Windows.Forms.FolderBrowserDialog; $g.Description = 'Select Workspace Root Directory'; $g.ShowNewFolderButton = $true; $r = $g.ShowDialog(); if ($r -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $g.SelectedPath }"`; // PowerShell command to invoke FolderBrowserDialog.
+  const result = await execAsync(cmd, process.cwd()); // Executed command stdout output.
+  return result;
+}

@@ -11,6 +11,10 @@ interface TerminalGridProps {
   onChangeLayout: (newLayout: MosaicNode<string> | null) => void; // Callback invoked when windows are rearranged or resized.
   onCloseTab: (tabId: string) => void; // Callback invoked when a terminal tab is closed.
   onAddTab: (name: string, direction?: 'row' | 'column') => void; // Callback invoked to spawn a new terminal tab.
+  branches: string[]; // List of git branches scanned in the workspace repository.
+  isGitRepo: boolean; // Flag marking if the workspace is a valid Git repository.
+  onChangeTabBranch: (tabId: string, branch: string) => Promise<void>; // Callback to switch the Git branch/worktree of a terminal tab.
+  onCreateTabBranch: (tabId: string, branchName: string) => Promise<void>; // Callback to create and check out a new branch on a terminal tab.
 }
 
 // Recursively removes a target tab ID from a mosaic window layout tree.
@@ -69,6 +73,10 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   onChangeLayout,
   onCloseTab,
   onAddTab,
+  branches,
+  isGitRepo,
+  onChangeTabBranch,
+  onCreateTabBranch,
 }) => {
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
 
@@ -82,11 +90,48 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
       const missingTile = <div className="p-4 text-neon-red">Terminal session missing</div>; // Fallback view.
       return missingTile;
     }
+
+    const handleSelectBranch = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const val = e.target.value; // Selected dropdown option.
+      if (val === '__create_new_branch__') {
+        const branchName = prompt('Enter name for the new branch:'); // User prompt response.
+        if (branchName && branchName.trim().length > 0) {
+          onCreateTabBranch(id, branchName.trim());
+        }
+      } else {
+        onChangeTabBranch(id, val);
+      }
+    }; // Event coordinator for tab branch dropdown select actions.
+
+    const branchSelector = isGitRepo ? (
+      <div className="flex items-center gap-1.5 mr-2" onClick={e => e.stopPropagation()} key="branch-selector">
+        <select
+          value={tabData.branch || ''}
+          onChange={handleSelectBranch}
+          className="bg-dark-900 border border-dark-700/60 rounded px-2 py-0.5 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-neon-blue cursor-pointer max-w-[120px] truncate"
+        >
+          <option value="">-- Direct (No branch) --</option>
+          {branches.map(b => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+          {tabData.branch && !branches.includes(tabData.branch) && (
+            <option value={tabData.branch}>{tabData.branch}</option>
+          )}
+          <option value="__create_new_branch__" className="text-neon-green font-bold">
+            + Create Branch...
+          </option>
+        </select>
+      </div>
+    ) : null; // Dynamic branch picker select tag.
+
     const tileView = (
       <MosaicWindow<string>
         path={path}
         title={tabData.name}
         toolbarControls={[
+          branchSelector,
           <button
             key="split-row"
             title="Split Horizontally"
@@ -111,7 +156,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>,
-        ]}
+        ].filter(Boolean) as React.ReactNode[]}
       >
         <TerminalTab workspaceId={workspaceId} tabId={id} isActive={true} />
       </MosaicWindow>

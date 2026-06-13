@@ -6,16 +6,16 @@ export interface TerminalTab {
   name: string; // User-facing name of the terminal tab.
   cwd: string; // Current working directory for this terminal session.
   shell?: string; // Optional shell path override for the terminal.
+  branch?: string; // Target Git branch assigned to this individual terminal tab.
+  worktreePath?: string; // Path to the generated git worktree for this tab if isolated.
 }
 
 export interface Workspace {
   id: string; // Unique identifier for the workspace.
   name: string; // User-facing name of the workspace.
   path: string; // Core absolute path to the workspace code directory.
-  branch?: string; // Target Git branch assigned to this workspace for isolation.
-  worktreePath?: string; // Path to the generated git worktree directory if isolated.
-  tabs: TerminalTab[]; // List of terminal tabs owned by this workspace.
   layout?: any; // The react-mosaic-component layout state for this workspace.
+  tabs: TerminalTab[]; // List of terminal tabs owned by this workspace.
 }
 
 export interface SessionDb {
@@ -51,13 +51,12 @@ export function getWorkspaces(): Workspace[] {
 }
 
 // Creates a new workspace and initializes it in the persistent database.
-export function createWorkspace(name: string, folderPath: string, branch?: string): Workspace {
+export function createWorkspace(name: string, folderPath: string): Workspace {
   const db = readDatabase(); // The active database object loaded from persistent storage.
   const newWorkspace: Workspace = {
     id: 'ws_' + Math.random().toString(36).substring(2, 9), // Dynamically generated unique workspace ID string.
     name: name, // The workspace name passed as a parameter.
     path: path.resolve(folderPath), // Resolved absolute path string.
-    branch: branch, // The optional git branch parameter.
     tabs: [], // Initialized empty list of terminal tabs.
   }; // The new workspace structure to append.
   db.workspaces.push(newWorkspace);
@@ -82,7 +81,7 @@ export function deleteWorkspace(id: string): void {
 }
 
 // Updates details of an existing workspace in the database.
-export function updateWorkspace(id: string, updates: Partial<Omit<Workspace, 'id'>>): Workspace | null {
+export function updateWorkspace(id: string, updates: Partial<Omit<Workspace, 'id' | 'tabs'>>): Workspace | null {
   const db = readDatabase(); // The loaded session database object.
   const wsIndex = db.workspaces.findIndex(ws => ws.id === id); // Index of the target workspace in the array.
   if (wsIndex === -1) {
@@ -125,4 +124,24 @@ export function deleteTerminalTab(workspaceId: string, tabId: string): void {
     ws.tabs = filteredTabs;
     writeDatabase(db);
   }
+}
+
+// Updates details of an existing terminal tab in a workspace.
+export function updateTerminalTab(workspaceId: string, tabId: string, updates: Partial<Omit<TerminalTab, 'id'>>): TerminalTab | null {
+  const db = readDatabase(); // The loaded session database object.
+  const ws = db.workspaces.find(w => w.id === workspaceId); // Target workspace instance.
+  if (!ws) {
+    const errorResult = null; // Target workspace not found.
+    return errorResult;
+  }
+  const tabIndex = ws.tabs.findIndex(t => t.id === tabId); // Index of the target tab.
+  if (tabIndex === -1) {
+    const errorResult = null; // Target tab not found.
+    return errorResult;
+  }
+  const updatedTab = { ...ws.tabs[tabIndex], ...updates }; // Blended terminal tab configuration.
+  ws.tabs[tabIndex] = updatedTab;
+  writeDatabase(db);
+  const result = updatedTab; // Returns the updated tab structure.
+  return result;
 }

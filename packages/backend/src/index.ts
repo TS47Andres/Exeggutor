@@ -35,24 +35,11 @@ async function bootstrap(): Promise<void> {
     return list;
   });
 
-  server.post<{ Body: { name: string; path: string; branch?: string } }>(
+  server.post<{ Body: { name: string; path: string } }>(
     '/api/workspaces',
     async (request, reply) => {
-      const { name, path: folderPath, branch } = request.body; // Deconstructed parameters from request body.
-      let createdWs = db.createWorkspace(name, folderPath, branch); // Reference to the created workspace.
-      if (branch && branch.trim().length > 0) {
-        try {
-          const wPath = await git.setupGitWorktree(folderPath, branch); // Generated worktree path from git controller.
-          const updated = db.updateWorkspace(createdWs.id, { worktreePath: wPath }); // Updated workspace reference.
-          if (updated) {
-            createdWs = updated;
-          }
-        } catch (err: any) {
-          reply.status(400);
-          const errorResp = { error: err.message || 'Failed to setup git worktree' }; // Error response structure.
-          return errorResp;
-        }
-      }
+      const { name, path: folderPath } = request.body; // Deconstructed parameters from request body.
+      const createdWs = db.createWorkspace(name, folderPath); // Reference to the created workspace.
       const finalResult = createdWs; // Workspace payload returned.
       return finalResult;
     }
@@ -63,74 +50,155 @@ async function bootstrap(): Promise<void> {
     const wsList = db.getWorkspaces(); // Entire registered workspaces array.
     const targetWs = wsList.find(w => w.id === id); // Found workspace object matching the target ID.
     if (targetWs) {
-      targetWs.tabs.forEach(tab => {
-        pty.killPtySession(tab.id);
-      });
-      if (targetWs.worktreePath) {
-        try {
-          await git.removeGitWorktree(targetWs.path, targetWs.worktreePath);
-        } catch (err) {
-          // Ignore pruning issues.
-        }
-      }
+      await Promise.all(
+        targetWs.tabs.map(async tab => {
+          pty.killPtySession(tab.id);
+          if (tab.worktreePath) {
+            try {
+              await git.removeGitWorktree(targetWs.path, tab.worktreePath);
+            } catch (err) {
+              // Ignore pruning issues.
+            }
+          }
+        })
+      ); // Run PTY shutdowns and worktree cleanups concurrently.
       db.deleteWorkspace(id);
     }
     const successResp = { success: true }; // Server confirmation object.
     return successResp;
   });
 
-  server.put<{ Params: { id: string }; Body: Partial<Omit<db.Workspace, 'id'>> }>(
+  server.put<{ Params: { id: string }; Body: Partial<Omit<db.Workspace, 'id' | 'tabs'>> }>(
     '/api/workspaces/:id',
     async (request, reply) => {
       const id = request.params.id; // Target workspace ID.
       const updates = request.body; // Updated attributes from body.
-      const targetWs = db.getWorkspaces().find(w => w.id === id); // Match target workspace config.
-      if (!targetWs) {
-        reply.status(404);
-        const errorResp = { error: 'Workspace not found' }; // Error payload.
-        return errorResp;
-      }
-      if (updates.branch !== undefined && updates.branch !== targetWs.branch) {
-        if (targetWs.worktreePath) {
-          try {
-            await git.removeGitWorktree(targetWs.path, targetWs.worktreePath);
-          } catch (err) {
-            // Safe cleanup.
-          }
-          db.updateWorkspace(id, { worktreePath: undefined });
-        }
-        if (updates.branch && updates.branch.trim().length > 0) {
-          try {
-            const wPath = await git.setupGitWorktree(targetWs.path, updates.branch); // Setup new worktree directory.
-            updates.worktreePath = wPath;
-          } catch (err: any) {
-            reply.status(400);
-            const errorResp = { error: err.message || 'Failed to setup git worktree' }; // Failed worktree setup response.
-            return errorResp;
-          }
-        }
-      }
       const updated = db.updateWorkspace(id, updates); // Workspace with applied patches.
       const returnResult = updated; // Refactored return workspace.
       return returnResult;
     }
   );
 
-  server.post<{ Params: { id: string }; Body: { name: string; cwd?: string; shell?: string } }>(
+  server.post<{ Params: { id: string }; Body: { name: string; shell?: string } }>(
     '/api/workspaces/:id/tabs',
     async (request, reply) => {
       const id = request.params.id; // Parent workspace ID.
-      const { name, cwd, shell } = request.body; // Input body variables.
+      const { name, shell } = request.body; // Input body variables.
       const targetWs = db.getWorkspaces().find(w => w.id === id); // Find matching workspace database entry.
       if (!targetWs) {
         reply.status(404);
         const errorResp = { error: 'Workspace not found' }; // Missing workspace error.
         return errorResp;
       }
-      const resolvedCwd = cwd || targetWs.worktreePath || targetWs.path; // Determine correct initial cwd prioritizing worktree paths.
-      const tab = db.createTerminalTab(id, name, resolvedCwd, shell); // New tab object created.
+      const tab = db.createTerminalTab(id, name, targetWs.path, shell); // New tab object created.
       const returnResult = tab; // Created tab descriptor.
       return returnResult;
+    }
+  );
+
+  server.put<{ Params: { id: string; tabId: string }; Body: { name?: string; branch?: string } }>(
+    '/api/workspaces/:id/tabs/:tabId',
+    async (request, reply) => {
+      const { id, tabId } = request.params; // Workspace and tab parameter keys.
+      const { name, branch } = request.body; // Extracted updates.
+      const targetWs = db.getWorkspaces().find(w => w.id === id); // Target workspace object.
+      if (!targetWs) {
+        reply.status(404);
+        const errorResp = { error: 'Workspace not found' }; // Error payload.
+        return errorResp;
+      }
+      const tab = targetWs.tabs.find(t => t.id === tabId); // Selected terminal tab.
+      if (!tab) {
+        reply.status(404);
+        const errorResp = { error: 'Terminal tab not found' }; // Error payload.
+        return errorResp;
+      }
+
+      let worktreePath = tab.worktreePath; // Preserve current worktree path reference.
+      let newCwd = tab.cwd; // Preserve current target current working directory.
+
+      if (branch !== undefined && branch !== tab.branch) {
+        pty.killPtySession(tabId);
+        if (tab.worktreePath) {
+          try {
+            await git.removeGitWorktree(targetWs.path, tab.worktreePath);
+          } catch (err) {
+            // Prune error.
+          }
+          worktreePath = undefined;
+          newCwd = targetWs.path;
+        }
+        if (branch && branch.trim().length > 0) {
+          try {
+            const wPath = await git.setupGitWorktree(targetWs.path, branch); // Spawn isolated git worktree folder.
+            worktreePath = wPath;
+            newCwd = wPath;
+          } catch (err: any) {
+            reply.status(400);
+            const errorResp = { error: err.message || 'Failed to setup git worktree' }; // Setup error.
+            return errorResp;
+          }
+        } else {
+          newCwd = targetWs.path;
+        }
+      }
+
+      const updates: Partial<db.TerminalTab> = {}; // Config updates map.
+      if (name !== undefined) {
+        updates.name = name;
+      }
+      if (branch !== undefined) {
+        updates.branch = branch ? branch : undefined;
+        updates.worktreePath = worktreePath;
+        updates.cwd = newCwd;
+      }
+
+      const updated = db.updateTerminalTab(id, tabId, updates); // Flush updates to sessions database.
+      const returnResult = updated; // Updated tab object.
+      return returnResult;
+    }
+  );
+
+  server.post<{ Params: { id: string; tabId: string }; Body: { name: string } }>(
+    '/api/workspaces/:id/tabs/:tabId/branches',
+    async (request, reply) => {
+      const { id, tabId } = request.params; // Workspace and tab keys.
+      const { name: branchName } = request.body; // New branch name.
+      const targetWs = db.getWorkspaces().find(w => w.id === id); // Found workspace.
+      if (!targetWs) {
+        reply.status(404);
+        const errorResp = { error: 'Workspace not found' }; // Error payload.
+        return errorResp;
+      }
+      const tab = targetWs.tabs.find(t => t.id === tabId); // Target tab config.
+      if (!tab) {
+        reply.status(404);
+        const errorResp = { error: 'Terminal tab not found' }; // Error.
+        return errorResp;
+      }
+      try {
+        await git.createBranch(targetWs.path, branchName);
+        pty.killPtySession(tabId);
+        if (tab.worktreePath) {
+          try {
+            await git.removeGitWorktree(targetWs.path, tab.worktreePath);
+          } catch (err) {
+            // Prune error.
+          }
+        }
+        const wPath = await git.setupGitWorktree(targetWs.path, branchName); // Create new worktree directly.
+        const updated = db.updateTerminalTab(id, tabId, {
+          branch: branchName,
+          worktreePath: wPath,
+          cwd: wPath,
+        }); // Apply updates to database tab.
+        const returnResult = updated; // Tab payload.
+        return returnResult;
+      } catch (err: any) {
+        reply.status(400);
+        const errorResp = { error: err.message || 'Failed to create git branch' }; // Error payload.
+        return errorResp;
+      }
     }
   );
 
@@ -138,8 +206,19 @@ async function bootstrap(): Promise<void> {
     '/api/workspaces/:id/tabs/:tabId',
     async (request, reply) => {
       const { id, tabId } = request.params; // Tab and workspace parameters.
-      pty.killPtySession(tabId);
-      db.deleteTerminalTab(id, tabId);
+      const targetWs = db.getWorkspaces().find(w => w.id === id); // Found workspace.
+      if (targetWs) {
+        const tab = targetWs.tabs.find(t => t.id === tabId); // Target tab config.
+        pty.killPtySession(tabId);
+        if (tab && tab.worktreePath) {
+          try {
+            await git.removeGitWorktree(targetWs.path, tab.worktreePath);
+          } catch (err) {
+            // Ignore.
+          }
+        }
+        db.deleteTerminalTab(id, tabId);
+      }
       const successResp = { success: true }; // Operation complete.
       return successResp;
     }
@@ -161,6 +240,17 @@ async function bootstrap(): Promise<void> {
       reply.status(500);
       const errorResp = { error: err.message || 'Failed to query git branches' }; // Error payload.
       return errorResp;
+    }
+  });
+
+  server.get('/api/browse', async (request, reply) => {
+    try {
+      const folder = await git.showFolderPicker(); // Show native selector.
+      const returnResult = { path: folder }; // Selected folder path payload.
+      return returnResult;
+    } catch (err) {
+      const errorResult = { path: '' }; // Canceled path.
+      return errorResult;
     }
   });
 

@@ -6,29 +6,24 @@ interface WorkspaceSelectorProps {
   workspaces: Workspace[]; // List of registered workspaces.
   activeWorkspaceId?: string; // The ID of the currently active workspace.
   onSelectWorkspace: (id: string) => void; // Triggered when switching workspaces.
-  onCreateWorkspace: (name: string, path: string, branch?: string) => Promise<void>; // Triggered when adding a new workspace.
+  onCreateWorkspace: (name: string, path: string) => Promise<void>; // Triggered when adding a new workspace.
   onDeleteWorkspace: (id: string) => Promise<void>; // Triggered when deleting a workspace.
-  onUpdateWorkspace: (id: string, updates: Partial<Workspace>) => Promise<void>; // Triggered when updating workspace configs.
 }
 
-// Manages the workspaces and Git worktree bindings.
+// Manages the workspaces selection, deletion, and directory registration.
 export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   workspaces,
   activeWorkspaceId,
   onSelectWorkspace,
   onCreateWorkspace,
   onDeleteWorkspace,
-  onUpdateWorkspace,
 }) => {
   const [isOpen, setIsOpen] = useState(false); // Controls workspaces dropdown list visibility.
   const [showAddForm, setShowAddForm] = useState(false); // Controls visibility of the add new workspace form.
   const [name, setName] = useState(''); // New workspace name text input.
   const [folderPath, setFolderPath] = useState(''); // New workspace absolute directory path text input.
-  const [branch, setBranch] = useState(''); // Optional initial Git branch input.
-  
-  const [branches, setBranches] = useState<string[]>([]); // Git branch options retrieved from current workspace repo.
   const [isGitRepo, setIsGitRepo] = useState(true); // Flag marking if the current workspace directory is a valid git repository.
-  const [isLoadingBranches, setIsLoadingBranches] = useState(false); // Controls loading indicators for branch fetch operations.
+  const [isLoadingGitState, setIsLoadingGitState] = useState(false); // Controls loading indicators for git repo scan operations.
 
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId); // Reference to the active workspace.
 
@@ -36,24 +31,19 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
     if (!activeWorkspace) {
       return;
     }
-    setIsLoadingBranches(true);
+    setIsLoadingGitState(true);
     fetch(`http://localhost:4000/api/workspaces/${activeWorkspace.id}/git/branches`)
       .then(res => {
         if (!res.ok) {
           throw new Error();
         }
-        return res.json();
-      })
-      .then((data: string[]) => {
-        setBranches(data);
         setIsGitRepo(true);
       })
       .catch(() => {
-        setBranches([]);
         setIsGitRepo(false);
       })
       .finally(() => {
-        setIsLoadingBranches(false);
+        setIsLoadingGitState(false);
       });
   }, [activeWorkspaceId, activeWorkspace]);
 
@@ -63,27 +53,26 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       return;
     }
     try {
-      await onCreateWorkspace(name, folderPath, branch ? branch : undefined);
+      await onCreateWorkspace(name, folderPath);
       setName('');
       setFolderPath('');
-      setBranch('');
       setShowAddForm(false);
     } catch (err) {
       // Form submit issue.
     }
   }; // Handle form submits.
 
-  const handleBranchChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!activeWorkspace) {
-      return;
-    }
-    const val = e.target.value; // Selected target branch.
+  const handleBrowse = async () => {
     try {
-      await onUpdateWorkspace(activeWorkspace.id, { branch: val ? val : undefined });
+      const res = await fetch('http://localhost:4000/api/browse'); // Network call to backend picker.
+      const data = await res.json() as { path: string }; // Parsed response folder path.
+      if (data && data.path) {
+        setFolderPath(data.path);
+      }
     } catch (err) {
-      // Branch update failed.
+      // Safe skip.
     }
-  }; // Handles selection dropdown actions.
+  }; // Spawns the native folder picker dialog.
 
   const dropdownView = (
     <div className="relative z-20">
@@ -121,24 +110,25 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             ) : (
               workspaces.map(ws => {
                 const isSelected = ws.id === activeWorkspaceId; // Selected active workspace.
-              const item = (
-                <div
-                  key={ws.id}
-                  onClick={() => {
-                    onSelectWorkspace(ws.id);
-                    setIsOpen(false);
-                  }}
-                  className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-dark-700/50 text-sm"
-                >
-                  <span className="flex items-center gap-2 truncate text-slate-300">
-                    <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-neon-blue' : 'text-slate-500'}`} />
-                    {ws.name}
-                  </span>
-                  {isSelected && <Check className="w-4 h-4 text-neon-green" />}
-                </div>
-              ); // Workspace options item.
-              return item;
-            }))}
+                const item = (
+                  <div
+                    key={ws.id}
+                    onClick={() => {
+                      onSelectWorkspace(ws.id);
+                      setIsOpen(false);
+                    }}
+                    className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-dark-700/50 text-sm"
+                  >
+                    <span className="flex items-center gap-2 truncate text-slate-300">
+                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-neon-blue' : 'text-slate-500'}`} />
+                      {ws.name}
+                    </span>
+                    {isSelected && <Check className="w-4 h-4 text-neon-green" />}
+                  </div>
+                ); // Workspace options item.
+                return item;
+              })
+            )}
           </div>
           {workspaces.length > 0 && activeWorkspace && (
             <div className="border-t border-dark-700/60 mt-1 pt-1 px-1">
@@ -174,24 +164,23 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Root Path</label>
-              <input
-                type="text"
-                required
-                value={folderPath}
-                onChange={e => setFolderPath(e.target.value)}
-                placeholder="c:/projects/my-project"
-                className="w-full bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-neon-blue focus:outline-none"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Git Isolation Branch (Optional)</label>
-              <input
-                type="text"
-                value={branch}
-                onChange={e => setBranch(e.target.value)}
-                placeholder="feature-sandbox"
-                className="w-full bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-neon-blue focus:outline-none"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  required
+                  value={folderPath}
+                  onChange={e => setFolderPath(e.target.value)}
+                  placeholder="c:/projects/my-project"
+                  className="flex-1 bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-neon-blue focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleBrowse}
+                  className="px-3 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-dark-700 rounded text-slate-200 transition-colors font-medium"
+                >
+                  Browse
+                </button>
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
@@ -218,39 +207,20 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
     <div className="flex items-center gap-6 text-xs text-slate-400 bg-dark-800/40 border border-dark-700/40 rounded-lg px-4 py-2 select-none">
       <div className="flex items-center gap-1.5 truncate">
         <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">CWD:</span>
-        <span className="font-mono text-slate-300 truncate max-w-xs">{activeWorkspace.worktreePath || activeWorkspace.path}</span>
+        <span className="font-mono text-slate-300 truncate max-w-xs">{activeWorkspace.path}</span>
       </div>
 
-      {isGitRepo ? (
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5 text-neon-blue" />
-            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">Worktree Branch:</span>
-            {isLoadingBranches ? (
-              <span className="text-slate-500 animate-pulse">Loading...</span>
-            ) : (
-              <select
-                value={activeWorkspace.branch || ''}
-                onChange={handleBranchChange}
-                className="bg-dark-900 border border-dark-700/60 rounded px-2 py-0.5 text-slate-300 focus:outline-none focus:border-neon-blue cursor-pointer"
-              >
-                <option value="">-- No Isolation (Local checkout) --</option>
-                {branches.map(b => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-                {activeWorkspace.branch && !branches.includes(activeWorkspace.branch) && (
-                  <option value={activeWorkspace.branch}>{activeWorkspace.branch}</option>
-                )}
-              </select>
-            )}
-          </div>
+      {isLoadingGitState ? (
+        <span className="text-slate-500 animate-pulse">Scanning...</span>
+      ) : isGitRepo ? (
+        <div className="flex items-center gap-1.5 text-neon-emerald shrink-0 select-none">
+          <GitBranch className="w-3.5 h-3.5" />
+          <span className="font-bold text-[10px] uppercase tracking-wider">Git Repo</span>
         </div>
       ) : (
         <div className="flex items-center gap-1.5 text-slate-500 shrink-0 select-none">
           <AlertCircle className="w-3.5 h-3.5" />
-          <span>Non-Git Directory</span>
+          <span className="font-bold text-[10px] uppercase tracking-wider">Non-Git</span>
         </div>
       )}
     </div>

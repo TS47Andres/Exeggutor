@@ -118,11 +118,6 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                   <FolderOpen className={`w-4 h-4 ${isActiveWs ? 'text-neon-blue' : 'text-slate-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-slate-200 truncate">{ws.name}</div>
-                    {ws.branch && (
-                      <div className="text-[10px] text-neon-blue font-semibold tracking-wide truncate">
-                        worktree: {ws.branch}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -145,7 +140,14 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                           <div className="flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-slate-300 font-medium truncate">
                               <Terminal className="w-3 h-3 text-slate-500 shrink-0" />
-                              {tab.name}
+                              <span className="flex flex-col min-w-0">
+                                <span className="truncate">{tab.name}</span>
+                                {tab.branch && (
+                                  <span className="text-[9px] text-neon-blue font-bold tracking-wide truncate">
+                                    branch: {tab.branch}
+                                  </span>
+                                )}
+                              </span>
                             </span>
                             {renderBadge(termStatus)}
                           </div>

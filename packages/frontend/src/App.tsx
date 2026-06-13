@@ -9,14 +9,14 @@ export interface TerminalTab {
   id: string; // Tab ID.
   name: string; // Tab name.
   cwd: string; // Working directory path for this terminal process.
+  branch?: string; // Target branch name assigned to this terminal tab.
+  worktreePath?: string; // Path to the generated git worktree for this tab if isolated.
 }
 
 export interface Workspace {
   id: string; // Workspace ID.
   name: string; // Workspace name.
   path: string; // Directory path.
-  branch?: string; // Target branch.
-  worktreePath?: string; // Path of git worktree.
   tabs: TerminalTab[]; // List of terminal tabs.
   layout?: any; // Mosaic layout.
 }
@@ -26,6 +26,31 @@ function App() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]); // Dynamic array of all workspaces loaded from server.
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(undefined); // Selected active workspace ID.
   const [layout, setLayout] = useState<MosaicNode<string> | null>(null); // Current mosaic panel configuration tree.
+  const [branches, setBranches] = useState<string[]>([]); // Dynamic list of scanned branches in the active workspace repository.
+  const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
+
+  useEffect(() => {
+    if (!activeWorkspaceId) {
+      setBranches([]);
+      setIsGitRepo(false);
+      return;
+    }
+    fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/git/branches`)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error();
+        }
+        return res.json();
+      })
+      .then((data: string[]) => {
+        setBranches(data);
+        setIsGitRepo(true);
+      })
+      .catch(() => {
+        setBranches([]);
+        setIsGitRepo(false);
+      });
+  }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
     fetch('http://localhost:4000/api/workspaces')
@@ -51,11 +76,11 @@ function App() {
     setLayout(target?.layout || null);
   }; // Selects a different workspace.
 
-  const handleCreateWorkspace = async (name: string, path: string, branch?: string) => {
+  const handleCreateWorkspace = async (name: string, path: string) => {
     const res = await fetch('http://localhost:4000/api/workspaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, path, branch }),
+      body: JSON.stringify({ name, path }),
     }); // Server response from workspace creation API.
     if (!res.ok) {
       const errData = await res.json(); // Parsed error response.
@@ -84,23 +109,6 @@ function App() {
     }
   }; // Deletes a workspace path.
 
-  const handleUpdateWorkspace = async (id: string, updates: Partial<Workspace>) => {
-    const res = await fetch(`http://localhost:4000/api/workspaces/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    }); // Put request response.
-    if (!res.ok) {
-      const errData = await res.json(); // Deconstructed error details.
-      alert(errData.error || 'Failed to update workspace');
-      return;
-    }
-    const updatedWs = await res.json() as Workspace; // Server updated workspace.
-    setWorkspaces(prev => prev.map(w => w.id === id ? updatedWs : w));
-    if (id === activeWorkspaceId) {
-      setLayout(updatedWs.layout || null);
-    }
-  }; // Modifies workspace settings.
 
   const handleChangeLayout = async (newLayout: MosaicNode<string> | null) => {
     if (!activeWorkspaceId) {
@@ -158,6 +166,54 @@ function App() {
     }
   }; // Closes a terminal tab process.
 
+  const handleChangeTabBranch = async (tabId: string, branchName: string) => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch: branchName }),
+    }); // Tab branch update endpoint response.
+    if (!res.ok) {
+      const errData = await res.json(); // Error body details.
+      alert(errData.error || 'Failed to update terminal tab branch');
+      return;
+    }
+    const updatedTab = await res.json() as TerminalTab; // Server modified tab.
+    setWorkspaces(prev => prev.map(w => {
+      if (w.id === activeWorkspaceId) {
+        const nextTabs = w.tabs.map(t => t.id === tabId ? updatedTab : t); // Updated tabs list.
+        return { ...w, tabs: nextTabs };
+      }
+      return w;
+    }));
+  }; // Updates a terminal tab branch.
+
+  const handleCreateTabBranch = async (tabId: string, branchName: string) => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs/${tabId}/branches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: branchName }),
+    }); // Branch creation endpoint response.
+    if (!res.ok) {
+      const errData = await res.json(); // Error payload.
+      alert(errData.error || 'Failed to create git branch');
+      return;
+    }
+    const updatedTab = await res.json() as TerminalTab; // Returned tab schema.
+    setWorkspaces(prev => prev.map(w => {
+      if (w.id === activeWorkspaceId) {
+        const nextTabs = w.tabs.map(t => t.id === tabId ? updatedTab : t); // Upgraded tabs structure.
+        return { ...w, tabs: nextTabs };
+      }
+      return w;
+    }));
+  }; // Spawns branch for a tab.
+
   const renderDashboard = () => {
     if (!activeWorkspace) {
       const registerGuide = (
@@ -209,6 +265,10 @@ function App() {
           onChangeLayout={handleChangeLayout}
           onCloseTab={handleCloseTab}
           onAddTab={handleAddTab}
+          branches={branches}
+          isGitRepo={isGitRepo}
+          onChangeTabBranch={handleChangeTabBranch}
+          onCreateTabBranch={handleCreateTabBranch}
         />
       </div>
     ); // Main layouts mapping grid and terminals.
@@ -236,7 +296,6 @@ function App() {
           onSelectWorkspace={handleSelectWorkspace}
           onCreateWorkspace={handleCreateWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
-          onUpdateWorkspace={handleUpdateWorkspace}
         />
       </header>
 
