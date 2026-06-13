@@ -8,23 +8,22 @@ export default {
     extend: {
       colors: {
         dark: {
-          900: '#05070c', // Obsidian Deep Space Black.
-          800: '#0c0e17', // Deep Slate Gray.
-          700: '#181b2b', // Indigo Steel Border.
-          600: '#2a2e45', // Muted Slate Gray.
+          900: '#07080a', // Deep neutral obsidian black.
+          800: '#0e1016', // Charcoal dark card.
+          700: '#1a1f2c', // Slate steel gray border.
+          600: '#282f42', // Muted steel slate gray.
         },
         neon: {
-          blue: '#00f5ff', // Vibrant Cyber Cyan.
-          purple: '#bd5eff', // Neon Violet.
-          pink: '#d946ef', // Neon Magenta Pink.
-          green: '#10b981', // Cyber Emerald Green.
-          orange: '#f97316', // Cyber Neon Orange.
-          red: '#ff4a4a', // Cyber Neon Red.
+          blue: '#00e5ff', // Ice Cyan.
+          green: '#00ff88', // Neon Mint Green.
+          emerald: '#10b981', // Cyber Emerald Green.
+          orange: '#ff9800', // Neon Amber Orange.
+          red: '#ff3b3b', // Neon Red.
         }
       },
       boxShadow: {
-        glow: '0 0 15px rgba(0, 245, 255, 0.15)', // Cyan neon glow effect.
-        'glow-pink': '0 0 15px rgba(217, 70, 239, 0.15)', // Pink neon glow effect.
+        glow: '0 0 15px rgba(0, 229, 255, 0.15)', // Cyan neon glow effect.
+        'glow-green': '0 0 15px rgba(0, 255, 136, 0.15)', // Green neon glow effect.
       }
     },
   },

@@ -187,19 +187,21 @@ function App() {
 
     const gridLayout = (
       <div className="flex-1 flex flex-col min-h-0 bg-dark-900">
-        <div className="px-6 py-3 border-b border-dark-700/60 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-neon-blue" />
-            <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
+        {activeWorkspace.tabs.length > 0 && (
+          <div className="px-6 py-3 border-b border-dark-700/60 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-neon-blue" />
+              <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
+            </div>
+            <button
+              onClick={() => handleAddTab(`Terminal ${activeWorkspace.tabs.length + 1}`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 hover:bg-dark-700/60 border border-dark-700/60 hover:border-dark-700 text-xs font-semibold rounded text-slate-200 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Terminal
+            </button>
           </div>
-          <button
-            onClick={() => handleAddTab(`Terminal ${activeWorkspace.tabs.length + 1}`)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 hover:bg-dark-700/60 border border-dark-700/60 hover:border-dark-700 text-xs font-semibold rounded text-slate-200 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Terminal
-          </button>
-        </div>
+        )}
         <TerminalGrid
           workspaceId={activeWorkspace.id}
           tabs={activeWorkspace.tabs}
@@ -217,7 +219,7 @@ function App() {
     <div className="h-screen w-screen bg-dark-900 flex flex-col overflow-hidden text-slate-100">
       <header className="h-16 border-b border-neon-blue/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-tr from-neon-blue to-neon-purple rounded-lg flex items-center justify-center text-white shadow-lg shadow-neon-blue/20">
+          <div className="w-9 h-9 bg-gradient-to-tr from-neon-blue to-neon-green rounded-lg flex items-center justify-center text-white shadow-lg shadow-neon-blue/20">
             <Terminal className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col">

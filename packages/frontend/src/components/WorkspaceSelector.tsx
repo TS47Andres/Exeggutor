@@ -112,10 +112,15 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-dark-800 border border-dark-700 rounded-lg shadow-xl py-1 z-30">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-dark-800 border border-dark-700 rounded-lg shadow-xl py-1.5 z-30 select-none">
           <div className="max-h-60 overflow-y-auto">
-            {workspaces.map(ws => {
-              const isSelected = ws.id === activeWorkspaceId; // Selected active workspace.
+            {workspaces.length === 0 ? (
+              <div className="px-4 py-3 text-xs text-slate-400 text-center">
+                No workspaces registered
+              </div>
+            ) : (
+              workspaces.map(ws => {
+                const isSelected = ws.id === activeWorkspaceId; // Selected active workspace.
               const item = (
                 <div
                   key={ws.id}
@@ -133,7 +138,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 </div>
               ); // Workspace options item.
               return item;
-            })}
+            }))}
           </div>
           {workspaces.length > 0 && activeWorkspace && (
             <div className="border-t border-dark-700/60 mt-1 pt-1 px-1">

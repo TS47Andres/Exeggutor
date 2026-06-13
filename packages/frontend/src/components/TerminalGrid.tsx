@@ -131,7 +131,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
         </p>
         <button
           onClick={handleAddTerminal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-neon-blue to-neon-purple text-white font-medium rounded-lg hover:shadow-lg hover:shadow-neon-blue/20 transition-all duration-200"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-neon-blue to-neon-green text-white font-medium rounded-lg hover:shadow-lg hover:shadow-neon-blue/20 transition-all duration-200"
         >
           <Plus className="w-4 h-4" />
           Spawn Terminal Tab
