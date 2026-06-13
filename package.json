@@ -1,0 +1,8 @@
+{
+  "name": "omnishell-multiplexer-root",
+  "private": true,
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend"
+  ]
+}
