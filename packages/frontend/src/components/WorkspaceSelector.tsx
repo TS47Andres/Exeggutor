@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Folder, GitBranch, Plus, Check, Trash2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Folder, GitBranch, Plus, Check, Trash2, AlertCircle, XCircle } from 'lucide-react';
 import { Workspace } from '../App';
 
 interface WorkspaceSelectorProps {
@@ -24,6 +24,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   const [folderPath, setFolderPath] = useState(''); // New workspace absolute directory path text input.
   const [isGitRepo, setIsGitRepo] = useState(true); // Flag marking if the current workspace directory is a valid git repository.
   const [isLoadingGitState, setIsLoadingGitState] = useState(false); // Controls loading indicators for git repo scan operations.
+  const [browseError, setBrowseError] = useState(''); // Temporary error message displayed after a failed folder browse attempt.
 
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId); // Reference to the active workspace.
 
@@ -62,17 +63,22 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
     }
   }; // Handle form submits.
 
-  const handleBrowse = async () => {
+  const selectWorkspaceFolder = useCallback(async () => {
+    setBrowseError('');
     try {
-      const res = await fetch('http://localhost:4000/api/browse'); // Network call to backend picker.
-      const data = await res.json() as { path: string }; // Parsed response folder path.
-      if (data && data.path) {
+      const res = await fetch('http://localhost:4000/api/browse');
+      const data = await res.json() as { path: string; error?: string };
+      if (data?.path) {
         setFolderPath(data.path);
+      } else if (data?.error) {
+        setBrowseError(data.error);
+        setTimeout(() => setBrowseError(''), 5000);
       }
     } catch (err) {
-      // Safe skip.
+      setBrowseError('Could not reach the backend server to open the folder picker.');
+      setTimeout(() => setBrowseError(''), 5000);
     }
-  }; // Spawns the native folder picker dialog.
+  }, []); // Opens native folder picker via the backend.
 
   const dropdownView = (
     <div className="relative z-20">
@@ -175,13 +181,19 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={handleBrowse}
+                  onClick={selectWorkspaceFolder}
                   className="px-3 py-1.5 text-xs bg-dark-700 hover:bg-dark-600 border border-dark-700 rounded text-slate-200 transition-colors font-medium"
                 >
                   Browse
                 </button>
               </div>
             </div>
+            {browseError && (
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-neon-red/10 border border-neon-red/20 rounded text-[11px] text-neon-red">
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{browseError}</span>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"

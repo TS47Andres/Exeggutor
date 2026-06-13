@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -104,30 +104,62 @@ export async function createBranch(repoPath: string, branchName: string): Promis
   await execAsync(`git branch "${branchName}"`, resolvedRepo);
 }
 
-// Opens a native folder selection dialog on Windows and returns the selected path.
+// Spawns the compiled native folder picker binary (FolderPicker.exe).
+// Uses .NET OpenFileDialog (modern Vista-style IFileOpenDialog on Win10/11).
+// No PowerShell, no cmd.exe, no shell launching involved.
 export async function showFolderPicker(): Promise<string> {
-  const script = [
-    "Add-Type -AssemblyName System.Windows.Forms;",
-    "$f = New-Object System.Windows.Forms.OpenFileDialog;",
-    "$f.Filter = 'Folders|*';",
-    "$f.CheckFileExists = $false;",
-    "$f.CheckPathExists = $true;",
-    "$f.DereferenceLinks = $true;",
-    "$f.Multiselect = $false;",
-    "$f.Title = 'Select Workspace Folder';",
-    "$type = $f.GetType();",
-    "$vista = $type.GetMethod('CreateVistaDialog', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $null);",
-    "$type.GetMethod('OnBeforeVistaDialog', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $vista);",
-    "$opt = [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+FOS').GetField('FOS_PICKFOLDERS').GetValue($null);",
-    "$opts = $type.GetMethod('get_Options', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($f, $null) -bor $opt;",
-    "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+IFileDialog').GetMethod('SetOptions', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, $opts);",
-    "if ($type.GetMethod('Show', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, [IntPtr]::Zero) -eq 0) {",
-    "  $res = [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms').GetType('System.Windows.Forms.FileDialogNative+IFileDialog').GetMethod('GetResult', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($vista, $null);",
-    "  $path = $res.GetType().GetMethod('GetDisplayName', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($res, 0x80058000);",
-    "  Write-Output $path;",
-    "}"
-  ]; // Condensed single-line PowerShell commands block.
-  const cmd = "powershell -Command \"" + script.join(' ') + "\""; // Full PowerShell command line.
-  const result = await execAsync(cmd, process.cwd()); // Executed command stdout output.
-  return result;
+  const binaryPath = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
+  const resolvedPath = path.resolve(binaryPath);
+
+  console.log(`[showFolderPicker] __dirname=${__dirname}`);
+  console.log(`[showFolderPicker] binaryPath=${resolvedPath}`);
+  console.log(`[showFolderPicker] binary exists=${fs.existsSync(resolvedPath)}`);
+
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(
+      `Native folder picker not available (not found at ${resolvedPath}). ` +
+      'Run the compile script (npm run compile-picker) to build it, ' +
+      'or type the workspace path manually.'
+    );
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    console.log(`[showFolderPicker] spawning...`);
+    const child = spawn(resolvedPath, [], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: false,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.on('spawn', () => {
+      console.log(`[showFolderPicker] process spawned, pid=${child.pid}`);
+    });
+
+    child.stdout.on('data', (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code: number | null) => {
+      if (code === 0) {
+        const trimmed = stdout.trim();
+        console.log(`[showFolderPicker] success, path="${trimmed}"`);
+        resolve(trimmed);
+      } else {
+        const errMsg = stderr.trim() || `Folder picker exited with code ${code}`;
+        console.error(`[showFolderPicker] failed: ${errMsg}`);
+        reject(new Error(errMsg));
+      }
+    });
+
+    child.on('error', (err: Error) => {
+      console.error(`[showFolderPicker] spawn error: ${err.message}`);
+      reject(new Error(`Failed to launch folder picker: ${err.message}`));
+    });
+  });
 }

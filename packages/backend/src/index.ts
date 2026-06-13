@@ -245,12 +245,11 @@ async function bootstrap(): Promise<void> {
 
   server.get('/api/browse', async (request, reply) => {
     try {
-      const folder = await git.showFolderPicker(); // Show native selector.
-      const returnResult = { path: folder }; // Selected folder path payload.
-      return returnResult;
-    } catch (err) {
-      const errorResult = { path: '' }; // Canceled path.
-      return errorResult;
+      const folder = await git.showFolderPicker();
+      return { path: folder };
+    } catch (err: any) {
+      reply.status(500);
+      return { path: '', error: err.message || 'Failed to open folder picker' };
     }
   });
 
