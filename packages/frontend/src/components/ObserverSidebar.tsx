@@ -130,8 +130,6 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                     ws.tabs.map(tab => {
                       const sessionInfo = sessionMap.get(tab.id); // Matches status payload.
                       const termStatus = sessionInfo?.status || 'Idle'; // Computed fallback status.
-                      const termPreview = sessionInfo?.preview || 'No output stream...'; // Display string preview.
-
                       const tabItemView = (
                         <div
                           key={tab.id}
@@ -150,9 +148,6 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                               </span>
                             </span>
                             {renderBadge(termStatus)}
-                          </div>
-                          <div className="text-[10px] text-slate-400 truncate font-mono bg-dark-900/80 p-1 rounded border border-dark-700/40">
-                            {termPreview}
                           </div>
                         </div>
                       ); // Tab listing.

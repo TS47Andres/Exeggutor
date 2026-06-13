@@ -5,7 +5,7 @@ import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
 
-const server: FastifyInstance = fastify({ logger: false }); // Fastify server instance running local services.
+const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
 const observerSockets = new Set<any>(); // Registry containing all active WebSocket connections for the observer sidebar.
 
 // Broadcasts the latest status of all terminal sessions to all observer socket clients.
@@ -260,14 +260,14 @@ async function bootstrap(): Promise<void> {
       reply.status(400).send('WebSocket connection expected');
     },
     wsHandler: (connection, req) => {
-      observerSockets.add(connection.socket);
+      observerSockets.add(connection);
       const initialPayload = JSON.stringify({
         type: 'observer',
         sessions: pty.getAllSessions(),
       }); // Initial data load payload for new client.
-      connection.socket.send(initialPayload);
-      connection.socket.on('close', () => {
-        observerSockets.delete(connection.socket);
+      connection.send(initialPayload);
+      connection.on('close', () => {
+        observerSockets.delete(connection);
       });
     },
   });
@@ -292,7 +292,7 @@ async function bootstrap(): Promise<void> {
         }
       }
       if (!activeTab || !activeWs) {
-        connection.socket.close(4001, 'Terminal tab not found');
+        connection.close(4001, 'Terminal tab not found');
         return;
       }
       const session = pty.getOrCreatePtySession(
@@ -303,33 +303,44 @@ async function bootstrap(): Promise<void> {
         broadcastObserverUpdate
       ); // Spawn or attach persistent session process.
 
+      session.activeSocket = connection; // Register the newly connected socket as the active connection.
+
       session.outputBuffer.forEach(chunk => {
-        connection.socket.send(chunk);
+        connection.send(chunk);
       });
 
+      // Handles incoming data from the persistent PTY process by sending it over the WebSocket.
       session.onData = (data: string) => {
         try {
-          connection.socket.send(data);
+          if (session.activeSocket === connection) {
+            connection.send(data);
+          }
         } catch (err) {
           // Socket write failed.
         }
       };
 
-      connection.socket.on('message', (message: string) => {
+      // Receives input and resize instructions from the WebSocket and forwards them to the PTY session.
+      connection.on('message', (messageData: any) => {
+        const rawMessage = messageData.toString(); // Normalized string representation of the incoming socket message.
         try {
-          const parsed = JSON.parse(message); // Parsed client websocket message.
+          const parsed = JSON.parse(rawMessage); // Parsed client websocket message.
           if (parsed && parsed.type === 'resize') {
             pty.resizePtySession(tabId, parsed.cols, parsed.rows);
           } else if (parsed && parsed.type === 'input') {
             pty.writeToPtySession(tabId, parsed.data);
           }
         } catch (err) {
-          pty.writeToPtySession(tabId, message.toString());
+          // Ignore invalid JSON payloads to prevent writing garbage or raw JSON controls to the shell.
         }
       });
 
-      connection.socket.on('close', () => {
-        session.onData = () => {};
+      // Disconnects the WebSocket connection and marks the PTY session active socket as empty.
+      connection.on('close', () => {
+        if (session.activeSocket === connection) {
+          session.activeSocket = undefined;
+          session.onData = () => {};
+        }
       });
     },
   });

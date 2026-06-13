@@ -303,7 +303,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
             key="split-row"
             title="Split Horizontally"
             onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
-            className="p-1 hover:text-neon-blue transition-colors mr-1"
+            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
           >
             <Split className="w-3.5 h-3.5 rotate-90" />
           </button>,
@@ -311,7 +311,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
             key="split-col"
             title="Split Vertically"
             onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
-            className="p-1 hover:text-neon-blue transition-colors mr-2"
+            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
           >
             <Split className="w-3.5 h-3.5" />
           </button>,
@@ -319,7 +319,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
             key="delete"
             title="Close Terminal"
             onClick={() => onCloseTab(id)}
-            className="p-1 hover:text-neon-red transition-colors"
+            className="p-1 text-slate-400 hover:text-neon-red transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>,
@@ -343,7 +343,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
         </p>
         <button
           onClick={handleAddTerminal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-neon-blue to-neon-green text-white font-medium rounded-lg hover:shadow-lg hover:shadow-neon-blue/20 transition-all duration-200"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-neon-blue to-neon-green text-black font-medium rounded-lg hover:shadow-lg hover:shadow-neon-blue/20 transition-all duration-200"
         >
           <Plus className="w-4 h-4" />
           Spawn Terminal Tab
@@ -356,7 +356,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   const activeLayout = layout || tabs[0].id; // Resolves default layout to single tile if tree state is null.
 
   const mosaicGrid = (
-    <div className="flex-1 h-full p-4 relative min-h-0 bg-dark-900">
+    <div className="flex-1 p-4 relative min-h-0 bg-dark-900">
       <Mosaic<string>
         renderTile={renderTile}
         value={activeLayout}

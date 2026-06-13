@@ -52,6 +52,22 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
     throw new Error('Target folder is not a valid Git repository');
   }
 
+  // Check if the branch is already checked out in any worktree (including the main repository).
+  const worktreeListOutput = await execAsync('git worktree list --porcelain', resolvedRepo); // Porcelain worktree list output.
+  const worktreeLines = worktreeListOutput.split('\n'); // Split by lines.
+  let currentWorktreePath = resolvedRepo; // Holds the path of the current worktree being processed.
+  for (const line of worktreeLines) {
+    if (line.startsWith('worktree ')) {
+      currentWorktreePath = line.substring(9).trim(); // Extract path.
+    } else if (line.startsWith('branch ')) {
+      const ref = line.substring(7).trim(); // Extract branch ref.
+      if (ref === `refs/heads/${branch}`) {
+        const foundWorktreePath = path.resolve(currentWorktreePath); // Found matching worktree path.
+        return foundWorktreePath;
+      }
+    }
+  }
+
   const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-_]/g, '_'); // Sanitized branch name to avoid unsafe folder characters.
   const worktreePath = path.join(resolvedRepo, '.git', 'worktrees-app', sanitizedBranch); // Path to host the worktree inside the local git configuration directory.
   const worktreeParent = path.dirname(worktreePath); // Parent directory of the target worktree path.

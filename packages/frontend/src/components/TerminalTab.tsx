@@ -31,13 +31,13 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
         cursor: '#ffffff',
         selectionBackground: 'rgba(255, 255, 255, 0.15)',
         black: '#000000',
-        red: '#3f3f46',
-        green: '#a1a1aa',
-        yellow: '#f4f4f5',
-        blue: '#ffffff',
-        magenta: '#e4e4e7',
-        cyan: '#71717a',
-        white: '#ffffff',
+        red: '#ef4444',
+        green: '#22c55e',
+        yellow: '#eab308',
+        blue: '#3b82f6',
+        magenta: '#ec4899',
+        cyan: '#06b6d4',
+        white: '#f4f4f5',
       },
     }); // Spawns a new client-side xterm Terminal instance.
     termRef.current = term;
@@ -49,6 +49,12 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     term.open(containerRef.current);
     if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
       fitAddon.fit();
+    } else {
+      setTimeout(() => {
+        if (containerRef.current && fitAddonRef.current) {
+          try { fitAddonRef.current.fit(); } catch (_) {}
+        }
+      }, 100);
     }
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Computes socket protocol matching current page protocol.
@@ -72,7 +78,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       try {
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
           fitAddon.fit();
-          if (ws.readyState === WebSocket.OPEN) {
+          if (ws.readyState === WebSocket.OPEN && term.cols > 0 && term.rows > 0) {
             const dims = { type: 'resize', cols: term.cols, rows: term.rows }; // Resizing details to transmit.
             ws.send(JSON.stringify(dims));
           }
@@ -87,8 +93,10 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       try {
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
           fitAddon.fit();
-          const dims = { type: 'resize', cols: term.cols, rows: term.rows }; // Initial resizing layout data.
-          ws.send(JSON.stringify(dims));
+          if (term.cols > 0 && term.rows > 0) {
+            const dims = { type: 'resize', cols: term.cols, rows: term.rows }; // Initial resizing layout data.
+            ws.send(JSON.stringify(dims));
+          }
         }
       } catch (err) {
         // Safe resize skip.
@@ -108,7 +116,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       try {
         if (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) {
           fitAddonRef.current.fit();
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current) {
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current && termRef.current.cols > 0 && termRef.current.rows > 0) {
             const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows }; // Focused resize dimensions.
             wsRef.current.send(JSON.stringify(dims));
           }

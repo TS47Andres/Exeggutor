@@ -29,7 +29,7 @@
   box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.5);
 }
 
-.mosaic-blueprint-theme .mosaic-window-titlebar {
+.mosaic-blueprint-theme .mosaic-window-toolbar {
   background: #18181b !important;
   color: #f4f4f5 !important;
   border-bottom: 1px solid #27272a !important;
@@ -38,11 +38,27 @@
   font-weight: 600;
   font-size: 0.825rem;
   padding: 0 14px !important;
+  box-shadow: none !important;
+}
+
+.mosaic-blueprint-theme .mosaic-window-title {
+  color: #f4f4f5 !important;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 0.825rem;
 }
 
 .mosaic-blueprint-theme .mosaic-window-body {
   background: #000000 !important;
   position: relative;
+}
+
+.mosaic-blueprint-theme .mosaic-window-body .xterm {
+  height: 100%;
+}
+
+.mosaic-blueprint-theme .mosaic-window-body .xterm-viewport {
+  overflow-y: auto;
 }
 
 .mosaic-blueprint-theme .mosaic-split {
