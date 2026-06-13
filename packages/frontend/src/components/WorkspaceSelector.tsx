@@ -153,7 +153,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       )}
 
       {showAddForm && (
-        <div className="absolute top-full left-0 mt-2 w-96 bg-dark-800 border border-dark-700 rounded-xl shadow-2xl p-4 z-30 space-y-4">
+        <div className="absolute top-full right-0 mt-2 w-96 bg-dark-800 border border-dark-700 rounded-xl shadow-2xl p-4 z-30 space-y-4">
           <h4 className="font-semibold text-sm text-slate-200">Register Workspace</h4>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1">

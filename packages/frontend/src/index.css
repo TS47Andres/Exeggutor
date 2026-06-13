@@ -18,42 +18,42 @@
 
 /* Custom mosaic styling override for premium dark glassmorphism */
 .mosaic-blueprint-theme {
-  background: #0b0f19 !important;
+  background: #05070c !important;
 }
 
 .mosaic-blueprint-theme .mosaic-window {
-  background: #111827 !important;
-  border: 1px solid #1f2937 !important;
-  border-radius: 8px;
+  background: #0c0e17 !important;
+  border: 1px solid #181b2b !important;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 .mosaic-blueprint-theme .mosaic-window-titlebar {
-  background: #1f2937 !important;
+  background: #181b2b !important;
   color: #f1f5f9 !important;
-  border-bottom: 1px solid #374151 !important;
-  height: 38px !important;
+  border-bottom: 1px solid #2a2e45 !important;
+  height: 40px !important;
   font-family: 'Outfit', sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.875rem;
-  padding: 0 12px !important;
+  padding: 0 16px !important;
 }
 
 .mosaic-blueprint-theme .mosaic-window-body {
-  background: #0b0f19 !important;
+  background: #05070c !important;
   position: relative;
 }
 
 .mosaic-blueprint-theme .mosaic-split {
-  background: #1f2937 !important;
-  width: 4px !important;
-  height: 4px !important;
+  background: #181b2b !important;
+  width: 5px !important;
+  height: 5px !important;
   z-index: 10;
 }
 
 .mosaic-blueprint-theme .mosaic-split:hover {
-  background: #3b82f6 !important;
+  background: #00f5ff !important;
 }
 
 .mosaic-blueprint-theme .control-button {
@@ -63,13 +63,13 @@
 }
 
 .mosaic-blueprint-theme .control-button:hover {
-  color: #3b82f6 !important;
+  color: #00f5ff !important;
   opacity: 1;
 }
 
 /* xterm.js theme tweaks */
 .xterm {
-  padding: 12px;
+  padding: 16px;
 }
 
 .xterm-viewport::-webkit-scrollbar {
@@ -77,14 +77,14 @@
 }
 
 .xterm-viewport::-webkit-scrollbar-track {
-  background: rgba(11, 15, 25, 0.5);
+  background: rgba(5, 7, 12, 0.5);
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(31, 41, 55, 0.8);
+  background: rgba(42, 46, 69, 0.8);
   border-radius: 4px;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.5);
+  background: rgba(0, 245, 255, 0.5);
 }
