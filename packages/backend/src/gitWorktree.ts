@@ -126,8 +126,8 @@ export async function showFolderPicker(): Promise<string> {
     "  $path = $res.GetType().GetMethod('GetDisplayName', [System.Reflection.BindingFlags]'NonPublic,Instance').Invoke($res, 0x80058000);",
     "  Write-Output $path;",
     "}"
-  ].join(' '); // Condensed single-line PowerShell commands block.
-  const cmd = "powershell -Command \"" + script.replace(/\$/g, '`$') + "\""; // Full PowerShell command line with escaped variables.
+  ]; // Condensed single-line PowerShell commands block.
+  const cmd = "powershell -Command \"" + script.join(' ') + "\""; // Full PowerShell command line.
   const result = await execAsync(cmd, process.cwd()); // Executed command stdout output.
   return result;
 }
