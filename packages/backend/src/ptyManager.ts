@@ -58,6 +58,7 @@ export function getOrCreatePtySession(
     rows: 24,
     cwd: cwd,
     env: process.env as Record<string, string>,
+    useConpty: false, // Forces winpty on Windows to avoid AttachConsole failed error in headless console environments.
   }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {

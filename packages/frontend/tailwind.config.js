@@ -8,22 +8,22 @@ export default {
     extend: {
       colors: {
         dark: {
-          900: '#07080a', // Deep neutral obsidian black.
-          800: '#0e1016', // Charcoal dark card.
-          700: '#1a1f2c', // Slate steel gray border.
-          600: '#282f42', // Muted steel slate gray.
+          900: '#000000', // Pure Black background.
+          800: '#09090b', // Deep Zinc Charcoal (cards/panels).
+          700: '#18181b', // Zinc Border.
+          600: '#27272a', // Mid-tone Zinc Gray.
         },
         neon: {
-          blue: '#00e5ff', // Ice Cyan.
-          green: '#00ff88', // Neon Mint Green.
-          emerald: '#10b981', // Cyber Emerald Green.
-          orange: '#ff9800', // Neon Amber Orange.
-          red: '#ff3b3b', // Neon Red.
+          blue: '#ffffff', // High-contrast active components (Pure White).
+          green: '#f4f4f5', // Light Zinc Gray.
+          emerald: '#a1a1aa', // Mid Zinc Gray.
+          orange: '#71717a', // Muted Zinc Gray.
+          red: '#3f3f46', // Dark Zinc Details.
         }
       },
       boxShadow: {
-        glow: '0 0 15px rgba(0, 229, 255, 0.15)', // Cyan neon glow effect.
-        'glow-green': '0 0 15px rgba(0, 255, 136, 0.15)', // Green neon glow effect.
+        glow: '0 0 10px rgba(255, 255, 255, 0.05)', // Subtle white header shadow.
+        'glow-green': '0 0 10px rgba(244, 244, 245, 0.05)', // Zinc border shadow.
       }
     },
   },
