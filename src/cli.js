@@ -173,12 +173,22 @@ async function showStatus(configPath) {
   }
 }
 
-// Opens the dashboard in the default browser.
-function openDashboard(configPath) {
+// Opens the dashboard in the default browser via a one-time session code instead of exposing the token in the URL.
+async function openDashboard(configPath) {
   const config = loadConfig(configPath); // Loaded configuration settings.
   const port = config.backendPort || 17492; // Active backend port.
   const token = config.authToken || ''; // Active authorization token.
-  const url = `http://localhost:${port}/?token=${token}`; // Formatted dashboard URL with token query string.
+
+  let url = `http://localhost:${port}/`; // Formatted dashboard URL without token.
+  if (token) {
+    try {
+      const response = await apiPost(port, '/api/auth/issue-session', {});
+      const parsed = JSON.parse(response); // Parsed session code response.
+      url = `http://localhost:${port}/?code=${parsed.code}`; // Dashboard URL with one-time session code.
+    } catch (err) {
+      // Fallback to opening without code — frontend will show the unauthorized screen.
+    }
+  }
 
   const platform = process.platform;
   try {
@@ -442,7 +452,10 @@ function getAuthToken() {
 function pingBackend(port) {
   return new Promise((resolve) => {
     const token = getAuthToken(); // Active authentication token.
-    const req = http.get(`http://localhost:${port}/api/workspaces?token=${token}`, (res) => {
+    const options = {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    }; // Request options with auth header.
+    const req = http.get(`http://localhost:${port}/api/workspaces`, options, (res) => {
       resolve(res.statusCode < 500);
     });
     req.on('error', () => resolve(false));

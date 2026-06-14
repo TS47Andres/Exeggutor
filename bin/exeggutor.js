@@ -65,8 +65,11 @@ if (first === '--status' || first === '-s') {
 
 // --open
 if (first === '--open') {
-  cli.openDashboard(CONFIG_PATH);
-  process.exit(0);
+  cli.openDashboard(CONFIG_PATH).catch(err => {
+    console.error('Failed to open dashboard:', err.message);
+    process.exit(1);
+  });
+  return;
 }
 
 // --log

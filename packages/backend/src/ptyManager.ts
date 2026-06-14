@@ -398,13 +398,53 @@ export function getAllSessions(): Array<{ id: string; workspaceId: string; statu
   return list;
 }
 
+// Verifies that a given PID belongs to an expected Exeggutor-managed process to avoid killing unrelated recycled PIDs.
+function verifyPidOwnership(pid: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const isWin = process.platform === 'win32'; // Flag indicating Windows platform.
+    if (isWin) {
+      exec(`tasklist /FI "PID eq ${pid}" /FO CSV /NH`, { windowsHide: true }, (err, stdout) => {
+        if (err || !stdout) {
+          resolve(false);
+          return;
+        }
+        const nameMatch = stdout.match(/"([^"]+)"/); // Capture the process executable name from CSV output.
+        if (!nameMatch) {
+          resolve(false);
+          return;
+        }
+        const name = nameMatch[1].toLowerCase(); // Process name from tasklist.
+        const knownNames = ['node.exe', 'powershell.exe', 'cmd.exe', 'bash.exe', 'wmic.exe', 'conhost.exe'];
+        resolve(knownNames.some(k => name.includes(k)));
+      }); // Spawn tasklist to verify process identity.
+    } else {
+      try {
+        const comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); // Process command name from proc filesystem.
+        const knownNames = ['node', 'bash', 'zsh', 'sh', 'dash', 'powershell'];
+        resolve(knownNames.includes(comm));
+      } catch {
+        resolve(false);
+      }
+    }
+  }); // Verifies that the PID matches an expected Exeggutor-managed process.
+}
+
 // Scans the database for previously persisted terminal tab process IDs and forcefully terminates any orphaned instances.
-export function cleanOrphanedPtyProcesses(): void {
+export async function cleanOrphanedPtyProcesses(): Promise<void> {
   try {
     const workspaces = db.getWorkspaces(); // Load workspaces from database.
     for (const ws of workspaces) {
       for (const tab of ws.tabs) {
         if (tab.pid) {
+          const ownsPid = await verifyPidOwnership(tab.pid); // Flag confirming the PID belongs to an expected process.
+          if (!ownsPid) {
+            try {
+              db.updateTerminalTab(ws.id, tab.id, { pid: undefined }); // Clear stale PID record without killing.
+            } catch (err) {
+              // Safe ignore database write failure.
+            }
+            continue;
+          }
           try {
             process.kill(tab.pid, 'SIGKILL'); // Force terminate the orphaned shell process.
           } catch (err) {

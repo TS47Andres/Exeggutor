@@ -31,7 +31,8 @@ function global:git {
                 if ($config.backendPort) { $port = $config.backendPort }
                 if ($config.authToken) { $token = $config.authToken }
             }
-            $response = Invoke-RestMethod -Uri "http://localhost:$port/api/branches/in-use?name=$targetBranch&token=$token" -ErrorAction Stop
+            $headers = @{ Authorization = "Bearer $token" }
+            $response = Invoke-RestMethod -Uri "http://localhost:$port/api/branches/in-use?name=$targetBranch" -Headers $headers -ErrorAction Stop
             if ($response.inUse -eq $true) {
                 Write-Error "Branch '$targetBranch' is in use by an active Exeggutor terminal. Switch the tab to another branch or close it first."
                 return

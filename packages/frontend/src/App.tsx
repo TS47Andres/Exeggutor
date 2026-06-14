@@ -7,14 +7,9 @@ import { MosaicNode } from 'react-mosaic-component';
 
 const API_BASE = ''; // Empty string means relative URLs (Vite proxy handles routing to backend).
 
-// Helper retrieving the active authentication token.
+// Helper retrieving the active authentication token from persistent local storage only.
 const getAuthToken = (): string => {
-  const urlParams = new URLSearchParams(window.location.search); // Parsed URL query parameters.
-  const token = urlParams.get('token') || localStorage.getItem('exeggutor_token') || ''; // Extracted authentication token.
-  if (token) {
-    localStorage.setItem('exeggutor_token', token);
-  }
-  return token;
+  return localStorage.getItem('exeggutor_token') || '';
 };
 
 // Performs a secure HTTP request, automatically injecting the persistent authentication token.
@@ -53,8 +48,40 @@ function App() {
   const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
   const [unauthorized, setUnauthorized] = useState(false); // Flag indicating if the session is unauthorized.
   const [isLoading, setIsLoading] = useState(true); // Flag indicating if the workspaces are currently loading.
+  const [ready, setReady] = useState(false); // Flag indicating if session code exchange has completed.
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search); // Parsed URL query parameters.
+    const code = urlParams.get('code'); // One-time session code from CLI.
+    if (!code) {
+      setReady(true);
+      return;
+    }
+    fetch(`${API_BASE}/api/auth/exchange-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Session code exchange failed');
+        return res.json();
+      })
+      .then(data => {
+        if (data.token) {
+          localStorage.setItem('exeggutor_token', data.token);
+        }
+        window.history.replaceState({}, document.title, window.location.pathname); // Remove the code from the URL bar.
+      })
+      .catch(() => {
+        // Exchange failed — user may need to use exeggutor --open from terminal.
+      })
+      .finally(() => setReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
     if (!activeWorkspaceId) {
       setBranches([]);
       setIsGitRepo(false);
@@ -75,9 +102,12 @@ function App() {
         setBranches([]);
         setIsGitRepo(false);
       });
-  }, [activeWorkspaceId, workspaces]);
+  }, [activeWorkspaceId, workspaces, ready]);
 
   useEffect(() => {
+    if (!ready) {
+      return;
+    }
     apiFetch(`${API_BASE}/api/workspaces`)
       .then(res => {
         if (res.status === 401) {
@@ -105,7 +135,7 @@ function App() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, []);
+  }, [ready]);
 
   if (unauthorized) {
     return (
@@ -122,7 +152,7 @@ function App() {
             exeggutor --open
           </div>
           <p className="text-xs text-slate-500 leading-normal">
-            Alternatively, check your <code className="text-slate-400 font-mono">~/.exeggutor.json</code> configuration file and append the token parameter directly to the URL.
+            Alternatively, check your <code className="text-slate-400 font-mono">~/.exeggutor.json</code> configuration file and restart the service with <code className="text-slate-400 font-mono">exeggutor --restart</code>.
           </p>
         </div>
       </div>
@@ -184,8 +214,15 @@ function App() {
     setWorkspaces(prev => prev.map(w => w.id === activeWorkspaceId ? { ...w, layout: newLayout } : w));
   }; // Persists window position states.
 
+  const MAX_TABS_PER_WORKSPACE = 4; // Maximum terminal tabs allowed per workspace.
+
   const handleAddTab = async (name: string, direction: 'row' | 'column' = 'row') => {
     if (!activeWorkspaceId) {
+      return;
+    }
+    const currentWs = workspaces.find(w => w.id === activeWorkspaceId); // Resolved active workspace.
+    if (currentWs && currentWs.tabs.length >= MAX_TABS_PER_WORKSPACE) {
+      alert(`Maximum ${MAX_TABS_PER_WORKSPACE} terminals per workspace`);
       return;
     }
     const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs`, {

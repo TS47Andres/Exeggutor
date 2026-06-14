@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
@@ -26,6 +27,7 @@ try {
 
 const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
 const observerSockets = new Set<any>(); // Registry containing all active WebSocket connections for the observer sidebar.
+const sessionCodes = new Map<string, { token: string; expires: number }>(); // One-time session codes for dashboard authentication exchange.
 
 // Broadcasts the latest status of all terminal sessions to all observer socket clients.
 function broadcastObserverUpdate(): void {
@@ -45,14 +47,14 @@ function broadcastObserverUpdate(): void {
 // Registers HTTP routes, WebSockets endpoints, and starts the Fastify service.
 async function bootstrap(): Promise<void> {
   // Clean up any orphaned terminal shell processes from previous runs.
-  pty.cleanOrphanedPtyProcesses();
+  await pty.cleanOrphanedPtyProcesses();
 
   await server.register(fastifyCors, { origin: true });
   await server.register(fastifyWebsocket);
 
   server.addHook('preHandler', async (request, reply) => {
     const url = request.url; // Target request URL path.
-    if (url.startsWith('/api') || url.startsWith('/ws')) {
+    if ((url.startsWith('/api') || url.startsWith('/ws')) && url !== '/api/auth/exchange-session') {
       let token = (request.query as any)?.token; // Token extracted from query parameter.
       if (!token) {
         const authHeader = request.headers.authorization; // Auth header content.
@@ -91,6 +93,32 @@ async function bootstrap(): Promise<void> {
 
   pty.startStatusAuditor(broadcastObserverUpdate);
 
+  server.post('/api/auth/issue-session', async (request, reply) => {
+    const code = crypto.randomBytes(16).toString('hex'); // Unpredictable one-time session code.
+    sessionCodes.set(code, { token: authToken, expires: Date.now() + 30000 }); // Code valid for 30 seconds.
+    return { code };
+  });
+
+  server.post('/api/auth/exchange-session', async (request, reply) => {
+    const { code } = request.body as any; // Session code from the URL.
+    const entry = sessionCodes.get(code); // Lookup matching code entry.
+    if (!entry || entry.expires < Date.now()) {
+      reply.status(401).send({ error: 'Invalid or expired session code' });
+      return reply;
+    }
+    sessionCodes.delete(code); // Invalidate code after use.
+    return { token: entry.token };
+  });
+
+  setInterval(() => {
+    const now = Date.now(); // Current timestamp.
+    sessionCodes.forEach((entry, code) => {
+      if (entry.expires < now) {
+        sessionCodes.delete(code);
+      }
+    }); // Purge expired session codes every 60 seconds.
+  }, 60000);
+
   server.get('/api/workspaces', async (request, reply) => {
     const list = db.getWorkspaces(); // Workspace list from database.
     return list;
@@ -100,9 +128,35 @@ async function bootstrap(): Promise<void> {
     '/api/workspaces',
     async (request, reply) => {
       const { name, path: folderPath } = request.body; // Deconstructed parameters from request body.
-      const createdWs = db.createWorkspace(name, folderPath); // Reference to the created workspace.
-      const finalResult = createdWs; // Workspace payload returned.
-      return finalResult;
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        reply.status(400);
+        return { error: 'Workspace name is required' };
+      }
+      if (name.trim().length > 100) {
+        reply.status(400);
+        return { error: 'Workspace name must be 100 characters or fewer' };
+      }
+      if (!folderPath || typeof folderPath !== 'string' || folderPath.trim().length === 0) {
+        reply.status(400);
+        return { error: 'Workspace path is required' };
+      }
+      const resolvedPath = path.resolve(folderPath.trim()); // Resolved absolute target path.
+      if (!fs.existsSync(resolvedPath)) {
+        reply.status(400);
+        return { error: 'Workspace path does not exist' };
+      }
+      if (!fs.statSync(resolvedPath).isDirectory()) {
+        reply.status(400);
+        return { error: 'Workspace path must be a directory' };
+      }
+      try {
+        fs.accessSync(resolvedPath, fs.constants.R_OK);
+      } catch {
+        reply.status(400);
+        return { error: 'Workspace path is not readable' };
+      }
+      const createdWs = db.createWorkspace(name.trim(), resolvedPath); // Reference to the created workspace.
+      return createdWs;
     }
   );
 
@@ -140,6 +194,8 @@ async function bootstrap(): Promise<void> {
     }
   );
 
+  const MAX_TABS_PER_WORKSPACE = 4; // Maximum number of terminal tabs allowed per workspace.
+
   server.post<{ Params: { id: string }; Body: { name: string; shell?: string } }>(
     '/api/workspaces/:id/tabs',
     async (request, reply) => {
@@ -149,6 +205,11 @@ async function bootstrap(): Promise<void> {
       if (!targetWs) {
         reply.status(404);
         const errorResp = { error: 'Workspace not found' }; // Missing workspace error.
+        return errorResp;
+      }
+      if (targetWs.tabs.length >= MAX_TABS_PER_WORKSPACE) {
+        reply.status(400);
+        const errorResp = { error: `Maximum ${MAX_TABS_PER_WORKSPACE} terminal tabs per workspace` }; // Tab limit error.
         return errorResp;
       }
       const tab = db.createTerminalTab(id, name, targetWs.path, shell); // New tab object created.

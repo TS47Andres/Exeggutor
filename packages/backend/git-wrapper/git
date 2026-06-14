@@ -46,7 +46,7 @@ if [ $? -eq 0 ] && [ -n "$BRANCH" ]; then
             TOKEN=$CONF_TOKEN
         fi
     fi
-    RESPONSE=$(curl -sf "http://localhost:$PORT/api/branches/in-use?name=$BRANCH&token=$TOKEN" 2>/dev/null)
+    RESPONSE=$(curl -sf -H "Authorization: Bearer $TOKEN" "http://localhost:$PORT/api/branches/in-use?name=$BRANCH" 2>/dev/null)
     if [ $? -ne 0 ]; then
         echo "ERROR: Cannot verify branch status. Exeggutor backend must be running. Branch deletion blocked for safety." >&2
         exit 1

@@ -267,7 +267,13 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null); // Active tab ID being renamed.
   const [renameValue, setRenameValue] = useState(''); // Text input value for the tab rename field.
 
+  const MAX_TABS = 4; // Maximum terminal tabs allowed per workspace.
+  const atTabLimit = tabs.length >= MAX_TABS; // Flag indicating the tab limit has been reached.
+
   const handleAddTerminal = () => {
+    if (atTabLimit) {
+      return;
+    }
     onAddTab(`Terminal ${tabs.length + 1}`);
   }; // Spawns a default shell terminal.
 
@@ -325,17 +331,17 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
             </button>
             <button
               key="split-row"
-              title="Split Horizontally"
-              onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
-              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+              title={atTabLimit ? `Max ${MAX_TABS} terminals reached` : 'Split Horizontally'}
+              onClick={() => !atTabLimit && onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
+              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-neon-blue'}`}
             >
               <Split className="w-3.5 h-3.5 rotate-90" />
             </button>
             <button
               key="split-col"
-              title="Split Vertically"
-              onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
-              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+              title={atTabLimit ? `Max ${MAX_TABS} terminals reached` : 'Split Vertically'}
+              onClick={() => !atTabLimit && onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
+              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-neon-blue'}`}
             >
               <Split className="w-3.5 h-3.5" />
             </button>
@@ -369,10 +375,15 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
         </p>
         <button
           onClick={handleAddTerminal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-neon-blue to-neon-green text-black font-medium rounded-lg hover:shadow-lg hover:shadow-neon-blue/20 transition-all duration-200"
+          disabled={atTabLimit}
+          className={`flex items-center gap-2 px-5 py-2.5 font-medium rounded-lg transition-all duration-200 ${
+            atTabLimit
+              ? 'bg-dark-800 text-slate-600 cursor-not-allowed border border-dark-700'
+              : 'bg-gradient-to-r from-neon-blue to-neon-green text-black hover:shadow-lg hover:shadow-neon-blue/20'
+          }`}
         >
           <Plus className="w-4 h-4" />
-          Spawn Terminal Tab
+          {atTabLimit ? `Max ${MAX_TABS} Reached` : 'Spawn Terminal Tab'}
         </button>
       </div>
     ); // Zero state view.
