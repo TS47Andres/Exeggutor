@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, Terminal, FolderOpen, AlertTriangle } from 'lucide-react';
+import { Terminal, FolderOpen, AlertTriangle } from 'lucide-react';
 import { Workspace } from '../App';
 
 interface ObserverSidebarProps {
@@ -89,11 +89,6 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
 
   const sidebarView = (
     <aside className="w-80 h-full bg-dark-800 border-r border-dark-700/60 flex flex-col shrink-0">
-      <div className="p-4 border-b border-dark-700/60 flex items-center gap-2">
-        <Eye className="w-5 h-5 text-neon-blue" />
-        <h2 className="font-semibold text-slate-200">Global Observer</h2>
-      </div>
-
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {workspaces.length === 0 ? (
           <div className="text-center py-8 text-slate-500 text-sm">

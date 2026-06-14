@@ -286,7 +286,7 @@ function App() {
             <h1 className="text-sm font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
               EXEGGUTOR
             </h1>
-            <span className="text-[10px] text-neon-blue font-bold tracking-widest uppercase">Local-First</span>
+
           </div>
         </div>
 

@@ -22,7 +22,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
     const term = new Terminal({
       cursorBlink: true,
-      cursorStyle: 'bar',
+      cursorStyle: 'block',
+      cursorInactiveStyle: 'bar',
       fontSize: 13,
       fontFamily: 'JetBrains Mono, monospace',
       theme: {
@@ -49,6 +50,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     term.open(containerRef.current);
     if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
       fitAddon.fit();
+      term.focus();
     } else {
       setTimeout(() => {
         if (containerRef.current && fitAddonRef.current) {
@@ -129,7 +131,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
   const view = (
     <div className="w-full h-full bg-dark-900 relative">
-      <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+      <div ref={containerRef} className="absolute inset-0 w-full h-full" onClick={() => termRef.current?.focus()} />
     </div>
   ); // The main layout representation.
   return view;
