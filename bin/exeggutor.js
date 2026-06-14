@@ -23,13 +23,13 @@ if (first === '--version' || first === '-v') {
 }
 
 // --help
-if (first === '--help' || first === '-h' || !first) {
+if (first === '--help' || first === '-h') {
   cli.showHelp();
   process.exit(0);
 }
 
-// --start (default if no recognized flag)
-if (first === '--start' || (first && !first.startsWith('--'))) {
+// --start (default if no recognized flag or no args)
+if (first === '--start' || !first || (first && !first.startsWith('--'))) {
   const passive = first === '--start';
   const extraArgs = passive ? args.slice(1) : args;
   cli.startServers(ROOT, CONFIG_PATH, extraArgs).catch(err => {

@@ -55,17 +55,23 @@ function startServers(root, config, logDir) {
     EXEGGUTOR_FRONTEND_PORT: String(frontendPort),
   };
 
-  // Start backend
-  console.log('Starting backend server...');
-  const backendCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const backendArgs = ['ts-node-dev', '--respawn', '--transpile-only', 'src/index.ts'];
-  const backendProcess = spawn(backendCmd, backendArgs, {
-    cwd: backendPath,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-    windowsHide: true,
-  });
+  // Start backend (use compiled dist/index.js if available, else ts-node-dev)
+  const backendCompiled = resolve(backendPath, 'dist', 'index.js');
+  const backendProcess = (existsSync(backendCompiled))
+    ? spawn(process.execPath, [backendCompiled], {
+        cwd: backendPath,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+        windowsHide: true,
+      })
+    : spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['ts-node-dev', '--respawn', '--transpile-only', 'src/index.ts'], {
+        cwd: backendPath,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+        windowsHide: true,
+      });
 
   const backendStream = require('fs').createWriteStream(backendLog, { flags: 'a' });
   backendProcess.stdout.pipe(backendStream);
@@ -75,17 +81,23 @@ function startServers(root, config, logDir) {
 
   config.backendPid = backendProcess.pid;
 
-  // Start frontend
-  console.log('Starting frontend server...');
-  const frontendCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const frontendArgs = ['vite', '--port', String(frontendPort)];
-  const frontendProcess = spawn(frontendCmd, frontendArgs, {
-    cwd: frontendPath,
-    env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-    windowsHide: true,
-  });
+  // Start frontend (use Vite preview if dist/ exists, else dev server)
+  const frontendDist = resolve(frontendPath, 'dist');
+  const frontendProcess = (existsSync(resolve(frontendDist, 'index.html')))
+    ? spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', 'preview', '--port', String(frontendPort), '--strictPort'], {
+        cwd: frontendPath,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+        windowsHide: true,
+      })
+    : spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', '--port', String(frontendPort)], {
+        cwd: frontendPath,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+        windowsHide: true,
+      });
 
   const frontendStream = require('fs').createWriteStream(frontendLog, { flags: 'a' });
   frontendProcess.stdout.pipe(frontendStream);
