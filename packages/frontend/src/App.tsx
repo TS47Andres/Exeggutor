@@ -52,6 +52,7 @@ function App() {
   const [branches, setBranches] = useState<string[]>([]); // Dynamic list of scanned branches in the active workspace repository.
   const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
   const [unauthorized, setUnauthorized] = useState(false); // Flag indicating if the session is unauthorized.
+  const [isLoading, setIsLoading] = useState(true); // Flag indicating if the workspaces are currently loading.
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -100,6 +101,9 @@ function App() {
       })
       .catch(() => {
         // Safe skip on server offline or unauthorized.
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
   }, []);
 
@@ -295,6 +299,15 @@ function App() {
 
 
   const renderDashboard = () => {
+    if (isLoading) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center bg-dark-900 select-none">
+          <div className="w-10 h-10 border-4 border-neon-blue/20 border-t-neon-blue rounded-full animate-spin mb-4" />
+          <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Loading Workspace...</span>
+        </div>
+      );
+    }
+
     if (!activeWorkspace) {
       const registerGuide = (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-lg mx-auto bg-dark-800/20 border border-dark-700/60 rounded-2xl my-16 select-none shadow-2xl">
