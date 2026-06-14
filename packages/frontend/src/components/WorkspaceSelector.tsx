@@ -36,7 +36,12 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       return;
     }
     setIsLoadingGitState(true);
-    fetch(`${API_BASE}/api/workspaces/${activeWorkspace.id}/git/branches`)
+    const gitToken = localStorage.getItem('exeggutor_token') || '';
+    const gitHeaders: Record<string, string> = {};
+    if (gitToken) {
+      gitHeaders['Authorization'] = `Bearer ${gitToken}`;
+    }
+    fetch(`${API_BASE}/api/workspaces/${activeWorkspace.id}/git/branches`, { headers: gitHeaders })
       .then(res => {
         if (!res.ok) {
           throw new Error();
