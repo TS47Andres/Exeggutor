@@ -133,7 +133,7 @@ const BranchSelector: React.FC<BranchSelectorProps> = ({
         className="flex items-center gap-1 px-2 py-1 hover:bg-dark-700/80 border border-dark-700 rounded-md text-slate-300 transition-all select-none shrink-0 font-medium font-sans"
       >
         <GitBranch className="w-3 h-3 text-slate-400" />
-        <span className="max-w-[80px] truncate">{activeLabel}</span>
+        <span className="max-w-[80px] truncate leading-none">{activeLabel}</span>
         <ChevronDown className="w-2.5 h-2.5 text-slate-500 shrink-0" />
       </button>
 
