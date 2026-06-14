@@ -37,9 +37,9 @@ function getDescendants(parentPid: number): Promise<Array<{ pid: number; name: s
         const parts = line.trim().split(/\s+/); // Splitted columns.
         if (parts.length >= 3) {
           if (isWin) {
-            const name = parts[0]; // Process executable name.
-            const ppid = parseInt(parts[parts.length - 2], 10); // Parent process identifier.
-            const pid = parseInt(parts[parts.length - 1], 10); // Target process identifier.
+            const ppid = parseInt(parts[0], 10); // Parent process identifier.
+            const pid = parseInt(parts[1], 10); // Target process identifier.
+            const name = parts.slice(2).join(' '); // Process executable name.
             if (!isNaN(pid) && !isNaN(ppid)) {
               procList.push({ pid, ppid, name });
             }
