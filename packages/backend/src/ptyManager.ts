@@ -165,10 +165,7 @@ export function getOrCreatePtySession(
     }
   }
 
-  // On Windows, use conhost.exe --headless to prevent the console window from flashing.
-  const winShell = isWin ? 'conhost.exe' : targetShell;
-  const winArgs = isWin ? ['--headless', targetShell, ...ptyArgs] : ptyArgs;
-  const ptyProcess = pty.spawn(winShell, winArgs, {
+  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,

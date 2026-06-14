@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 
@@ -10,6 +10,7 @@ interface TerminalTabProps {
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
 export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
+  const [ready, setReady] = useState(false); // Tracks if the container has non-zero dimensions.
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
@@ -18,10 +19,27 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
   const lastColsRef = useRef<number>(0); // Tracks the last successfully sent terminal column dimension.
   const lastRowsRef = useRef<number>(0); // Tracks the last successfully sent terminal row dimension.
 
+  // Phase 1: Wait for the container to have non-zero dimensions before creating the terminal.
   useEffect(() => {
-    if (!containerRef.current) {
+    const el = containerRef.current;
+    if (!el) return;
+    if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+      setReady(true);
       return;
     }
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+        setReady(true);
+        ro.disconnect();
+      }
+    });
+    ro.observe(el);
+    return () => { ro.disconnect(); setReady(false); };
+  }, []);
+
+  // Phase 2: Create the terminal and WebSocket only when the container has final dimensions.
+  useEffect(() => {
+    if (!ready || !containerRef.current) return;
 
     disposedRef.current = false;
 
@@ -83,14 +101,11 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     };
 
+    // Container has dimensions at this point, so fit succeeds immediately without flicker.
     term.open(containerRef.current);
-    if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
-      try {
-        fitAddon.fit();
-      } catch (_) { /* Safe initial fit skip. */ }
-      term.focus();
-      sendResize();
-    }
+    fitAddon.fit();
+    term.focus();
+    sendResize();
 
     ws.onmessage = (event) => {
       if (!disposedRef.current) {
@@ -133,7 +148,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       fitAddonRef.current = null;
     };
     return cleanup;
-  }, [tabId, workspaceId]);
+  }, [ready, tabId, workspaceId]);
 
   // Re-fits the terminal when the tab becomes active.
   useEffect(() => {
@@ -157,8 +172,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     }
   }, [isActive]);
-
-
 
   const view = (
     <div className="w-full h-full bg-dark-900 relative">
