@@ -105,7 +105,13 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
     const cleanup = () => {
       resizeObserver.disconnect();
-      ws.close();
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
       term.dispose();
       termRef.current = null;
       fitAddonRef.current = null;
@@ -113,6 +119,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     return cleanup;
   }, [tabId, workspaceId]);
 
+  // Re-fits the terminal when the tab becomes active.
   useEffect(() => {
     if (isActive && fitAddonRef.current && containerRef.current) {
       try {
@@ -131,13 +138,15 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
   // Updates the terminal font size and re-fits when the zoom level changes.
   useEffect(() => {
-    if (termRef.current && fitAddonRef.current) {
-      termRef.current.setOption('fontSize', fontSize);
+    const term = termRef.current;
+    const fit = fitAddonRef.current;
+    if (term && fit && typeof term.setOption === 'function') {
       try {
+        term.setOption('fontSize', fontSize);
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
-          fitAddonRef.current.fit();
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current && termRef.current.cols > 0 && termRef.current.rows > 0) {
-            const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows };
+          fit.fit();
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && term.cols > 0 && term.rows > 0) {
+            const dims = { type: 'resize', cols: term.cols, rows: term.rows };
             wsRef.current.send(JSON.stringify(dims));
           }
         }

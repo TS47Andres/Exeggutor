@@ -43,7 +43,13 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
     };
 
     const cleanup = () => {
-      ws.close();
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     }; // Socket cleanup handler.
     return cleanup;
   }, []);
