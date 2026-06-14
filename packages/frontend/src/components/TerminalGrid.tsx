@@ -280,7 +280,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   const renderTile = (id: string, path: any) => {
     const tabData = tabMap.get(id); // Configurations for this terminal leaf.
     if (!tabData) {
-      const missingTile = <div className="p-4 text-neon-red">Terminal session missing</div>; // Fallback view.
+      const missingTile = <div className="p-4 text-zinc-700">Terminal session missing</div>; // Fallback view.
       return missingTile;
     }
 
@@ -320,7 +320,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
               key="rename"
               title="Rename Terminal"
               onClick={handleRename}
-              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+              className="p-1 text-slate-500 hover:text-white transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>
@@ -328,7 +328,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
               key="split-row"
               title={atTabLimit ? `Max ${MAX_TABS} terminals reached` : 'Split Horizontally'}
               onClick={() => !atTabLimit && onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
-              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-neon-blue'}`}
+              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-white'}`}
             >
               <Split className="w-3.5 h-3.5 rotate-90" />
             </button>
@@ -336,7 +336,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
               key="split-col"
               title={atTabLimit ? `Max ${MAX_TABS} terminals reached` : 'Split Vertically'}
               onClick={() => !atTabLimit && onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
-              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-neon-blue'}`}
+              className={`p-1 transition-colors ${atTabLimit ? 'text-dark-700 cursor-not-allowed' : 'text-slate-500 hover:text-white'}`}
             >
               <Split className="w-3.5 h-3.5" />
             </button>
@@ -345,7 +345,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
               key="delete"
               title="Close Terminal"
               onClick={() => onCloseTab(id)}
-              className="p-1 text-slate-500 hover:text-neon-red transition-colors"
+              className="p-1 text-slate-500 hover:text-zinc-700 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -361,7 +361,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   if (tabs.length === 0) {
     const zeroState = (
       <div className="flex-1 flex flex-col items-center justify-center bg-dark-900 border border-dark-700/60 rounded-xl m-4 p-8 text-center">
-        <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center text-neon-blue mb-4 border border-dark-700">
+        <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center text-white mb-4 border border-dark-700">
           <LayoutGrid className="w-8 h-8 animate-pulse" />
         </div>
         <h3 className="text-lg font-semibold text-slate-100 mb-2">No Active Terminals</h3>
@@ -374,7 +374,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           className={`flex items-center gap-2 px-5 py-2.5 font-medium rounded-lg transition-all duration-200 ${
             atTabLimit
               ? 'bg-dark-800 text-slate-600 cursor-not-allowed border border-dark-700'
-              : 'bg-gradient-to-r from-neon-blue to-neon-green text-black hover:shadow-lg hover:shadow-neon-blue/20'
+              : 'bg-gradient-to-r from-white to-zinc-100 text-black hover:shadow-lg hover:shadow-white/20'
           }`}
         >
           <Plus className="w-4 h-4" />
@@ -420,7 +420,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-neon-blue hover:bg-neon-blue/80 text-dark-900 font-bold rounded transition-colors"
+                className="px-3 py-1.5 bg-white hover:bg-white/80 text-dark-900 font-bold rounded transition-colors"
               >
                 Save
               </button>

@@ -110,7 +110,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
           className="flex items-center justify-between gap-3 px-4 py-2 bg-dark-800 border border-dark-700/60 rounded-lg text-sm font-medium hover:border-dark-700 hover:bg-dark-800/80 transition-all w-64 text-left"
         >
           <span className="flex items-center gap-2 truncate">
-            <Folder className="w-4 h-4 text-neon-blue shrink-0" />
+            <Folder className="w-4 h-4 text-white shrink-0" />
             {activeWorkspace ? activeWorkspace.name : 'Select Workspace'}
           </span>
           <span className="text-[10px] text-slate-400 font-semibold tracking-wider">SELECT</span>
@@ -148,10 +148,10 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                     className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-dark-700/50 text-sm"
                   >
                     <span className="flex items-center gap-2 truncate text-slate-300">
-                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-neon-blue' : 'text-slate-500'}`} />
+                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
                       {ws.name}
                     </span>
-                    {isSelected && <Check className="w-4 h-4 text-neon-green" />}
+                    {isSelected && <Check className="w-4 h-4 text-zinc-100" />}
                   </div>
                 ); // Workspace options item.
                 return item;
@@ -187,7 +187,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="My Project"
-                className="w-full bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-neon-blue focus:outline-none"
+                className="w-full bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-white focus:outline-none"
               />
             </div>
             <div className="space-y-1">
@@ -199,7 +199,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                   value={folderPath}
                   onChange={e => setFolderPath(e.target.value)}
                   placeholder="c:/projects/my-project"
-                  className="flex-1 bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-neon-blue focus:outline-none"
+                  className="flex-1 bg-dark-900 border border-dark-700/60 rounded px-2.5 py-1.5 text-xs focus:border-white focus:outline-none"
                 />
                 <button
                   type="button"
@@ -212,7 +212,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
               </div>
             </div>
             {browseError && (
-              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-neon-red/10 border border-neon-red/20 rounded text-[11px] text-neon-red">
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-zinc-700/10 border border-zinc-700/20 rounded text-[11px] text-zinc-700">
                 <XCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{browseError}</span>
               </div>
@@ -227,7 +227,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
               </button>
               <button
                 type="submit"
-                className="px-3 py-1.5 text-xs bg-neon-blue hover:bg-neon-blue/80 text-dark-900 font-semibold rounded transition-colors"
+                className="px-3 py-1.5 text-xs bg-white hover:bg-white/80 text-dark-900 font-semibold rounded transition-colors"
               >
                 Register
               </button>
@@ -248,7 +248,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       {isLoadingGitState ? (
         <span className="text-slate-500 animate-pulse">Scanning...</span>
       ) : isGitRepo ? (
-        <div className="flex items-center gap-1.5 text-neon-emerald shrink-0 select-none">
+        <div className="flex items-center gap-1.5 text-emerald-400 shrink-0 select-none">
           <GitBranch className="w-3.5 h-3.5" />
           <span className="font-bold text-[10px] uppercase tracking-wider">Git Repo</span>
         </div>

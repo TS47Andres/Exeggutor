@@ -61,23 +61,23 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
     switch (status) {
       case 'Active':
         const activeBadge = (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neon-green/10 text-neon-green border border-neon-green/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-100/10 text-zinc-100 border border-zinc-100/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-100 animate-pulse" />
             Active
           </span>
         ); // Active label configuration.
         return activeBadge;
       case 'Waiting':
         const waitingBadge = (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neon-orange/10 text-neon-orange border border-neon-orange/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-neon-orange animate-bounce" />
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" />
             Waiting
           </span>
         ); // Waiting label configuration.
         return waitingBadge;
       case 'Errored':
         const erroredBadge = (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-neon-red/10 text-neon-red border border-neon-red/20">
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-zinc-700/10 text-zinc-700 border border-zinc-700/20">
             <AlertTriangle className="w-2.5 h-2.5" />
             Error
           </span>
@@ -109,7 +109,7 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                 key={ws.id}
                 className={`rounded-lg border transition-all duration-200 ${
                   isActiveWs
-                    ? 'bg-dark-900/50 border-neon-blue/30 shadow-md shadow-neon-blue/5'
+                    ? 'bg-dark-900/50 border-white/30 shadow-md shadow-white/5'
                     : 'bg-transparent border-dark-700/40 hover:border-dark-700'
                 }`}
               >
@@ -117,7 +117,7 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                   onClick={() => onSelectWorkspace(ws.id)}
                   className="p-3 flex items-center gap-2 cursor-pointer border-b border-dark-700/30"
                 >
-                  <FolderOpen className={`w-4 h-4 ${isActiveWs ? 'text-neon-blue' : 'text-slate-400'}`} />
+                  <FolderOpen className={`w-4 h-4 ${isActiveWs ? 'text-white' : 'text-slate-400'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-slate-200 truncate">{ws.name}</div>
                   </div>
@@ -143,7 +143,7 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
                               <span className="flex flex-col min-w-0">
                                 <span className="truncate">{tab.name}</span>
                                 {tab.branch && (
-                                  <span className="text-[9px] text-neon-blue font-bold tracking-wide truncate">
+                                  <span className="text-[9px] text-white font-bold tracking-wide truncate">
                                     branch: {tab.branch}
                                   </span>
                                 )}

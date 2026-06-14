@@ -148,7 +148,7 @@ function App() {
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
             Your session is unauthorized. To access the Exeggutor dashboard, please open it from your terminal using:
           </p>
-          <div className="w-full bg-dark-900 border border-dark-700/60 rounded-xl p-3.5 mb-6 text-left font-mono text-xs text-neon-blue select-all cursor-pointer">
+          <div className="w-full bg-dark-900 border border-dark-700/60 rounded-xl p-3.5 mb-6 text-left font-mono text-xs text-white select-all cursor-pointer">
             exeggutor --open
           </div>
           <p className="text-xs text-slate-500 leading-normal">
@@ -339,7 +339,7 @@ function App() {
     if (isLoading) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center bg-dark-900 select-none">
-          <div className="w-10 h-10 border-4 border-neon-blue/20 border-t-neon-blue rounded-full animate-spin mb-4" />
+          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
           <span className="text-xs font-semibold text-slate-400 tracking-wider uppercase">Loading Workspace...</span>
         </div>
       );
@@ -348,7 +348,7 @@ function App() {
     if (!activeWorkspace) {
       const registerGuide = (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-lg mx-auto bg-dark-800/20 border border-dark-700/60 rounded-2xl my-16 select-none shadow-2xl">
-          <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center border border-dark-700 text-neon-blue mb-4">
+          <div className="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center border border-dark-700 text-white mb-4">
             <Layout className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold text-slate-100 mb-2">Welcome to Exeggutor</h2>
@@ -357,7 +357,7 @@ function App() {
           </p>
           <div className="p-4 bg-dark-900 border border-dark-700/60 rounded-xl w-full text-left space-y-2">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-neon-blue" />
+              <Info className="w-3.5 h-3.5 text-white" />
               Quick Setup Guide
             </h4>
             <ol className="text-xs text-slate-400 list-decimal list-inside space-y-1.5">
@@ -376,7 +376,7 @@ function App() {
         {activeWorkspace.tabs.length > 0 && (
           <div className="px-6 py-3 border-b border-dark-700/60 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-neon-blue" />
+              <Terminal className="w-4 h-4 text-white" />
               <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
             </div>
             <div className="flex items-center gap-3">
@@ -410,9 +410,9 @@ function App() {
 
   const mainView = (
     <div className="h-screen w-screen bg-dark-900 flex flex-col overflow-hidden text-slate-100">
-      <header className="h-16 border-b border-neon-blue/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
+      <header className="h-16 border-b border-white/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-tr from-neon-blue to-neon-green rounded-lg flex items-center justify-center text-white shadow-lg shadow-neon-blue/20">
+          <div className="w-9 h-9 bg-gradient-to-tr from-white to-zinc-100 rounded-lg flex items-center justify-center text-white shadow-lg shadow-white/20">
             <Terminal className="w-5 h-5 text-dark-900" />
           </div>
           <div className="flex flex-col">
