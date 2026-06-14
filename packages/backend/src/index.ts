@@ -243,6 +243,23 @@ async function bootstrap(): Promise<void> {
     }
   });
 
+  server.get<{ Querystring: { name: string } }>('/api/branches/in-use', async (request, reply) => {
+    const { name } = request.query; // Branch name to check.
+    const allWorkspaces = db.getWorkspaces(); // All registered workspaces.
+    let inUse = false; // Default safety flag.
+    for (const ws of allWorkspaces) {
+      for (const tab of ws.tabs) {
+        if (tab.branch === name) {
+          inUse = true;
+          break;
+        }
+      }
+      if (inUse) { break; }
+    }
+    const result = { inUse }; // Response payload.
+    return result;
+  });
+
   server.get('/api/browse', async (request, reply) => {
     try {
       const folder = await git.showFolderPicker();

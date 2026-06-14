@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+REAL_GIT=$(command -v git 2>/dev/null)
+if [ -z "$REAL_GIT" ]; then
+    REAL_GIT=$(which git 2>/dev/null)
+fi
+if [ -z "$REAL_GIT" ]; then
+    echo "ERROR: git not found" >&2
+    exit 1
+fi
+
+is_branch_delete() {
+    local args=("$@")
+    if [ ${#args[@]} -lt 3 ]; then
+        return 1
+    fi
+    if [ "${args[0]}" != "branch" ]; then
+        return 1
+    fi
+    local i
+    for ((i=1; i<${#args[@]}-1; i++)); do
+        local flag="${args[$i]}"
+        if [ "$flag" = "-d" ] || [ "$flag" = "-D" ] || [ "$flag" = "--delete" ]; then
+            local next_idx=$((i+1))
+            local next="${args[$next_idx]}"
+            if [ "${next:0:1}" != "-" ]; then
+                echo "$next"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
+BRANCH=$(is_branch_delete "$@")
+if [ $? -eq 0 ] && [ -n "$BRANCH" ]; then
+    RESPONSE=$(curl -sf "http://localhost:4000/api/branches/in-use?name=$BRANCH" 2>/dev/null)
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Cannot verify branch status. Exeggutor backend must be running. Branch deletion blocked for safety." >&2
+        exit 1
+    fi
+    if echo "$RESPONSE" | grep -q '"inUse":true'; then
+        echo "ERROR: Branch '$BRANCH' is in use by an active Exeggutor terminal. Switch the tab to another branch or close it first." >&2
+        exit 1
+    fi
+fi
+
+exec "$REAL_GIT" "$@"
