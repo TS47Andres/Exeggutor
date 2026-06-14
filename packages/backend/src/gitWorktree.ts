@@ -181,7 +181,7 @@ export async function showFolderPicker(): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       const child = spawn(resolvedPath, [], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: false,
+        windowsHide: true,
       });
 
       let stdout = '';
