@@ -23,14 +23,20 @@ class FolderPicker
                     string path = Path.GetDirectoryName(dialog.FileName);
                     if (!string.IsNullOrEmpty(path))
                     {
-                        Console.Write(path);
+                        using (StreamWriter writer = new StreamWriter(Console.OpenStandardOutput()))
+                        {
+                            writer.Write(path);
+                        }
                     }
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.Error.Write("ERROR:" + ex.Message);
+            using (StreamWriter writer = new StreamWriter(Console.OpenStandardError()))
+            {
+                writer.Write("ERROR:" + ex.Message);
+            }
             Environment.Exit(1);
         }
     }

@@ -35,7 +35,7 @@ function compile() {
   try {
     execFileSync(csc, [
       '/nologo',
-      '/target:exe',
+      '/target:winexe',
       '/platform:anycpu',
       `/out:${OUTPUT}`,
       SOURCE,
