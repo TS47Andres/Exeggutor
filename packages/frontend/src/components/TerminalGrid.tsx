@@ -325,7 +325,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           </button>,
         ].filter(Boolean) as React.ReactNode[]}
       >
-        <TerminalTab workspaceId={workspaceId} tabId={id} isActive={true} />
+        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} />
       </MosaicWindow>
     ); // The rendered tile with toolbars.
     return tileView;
