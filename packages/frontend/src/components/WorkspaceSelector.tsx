@@ -253,7 +253,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
           <span className="font-bold text-[10px] uppercase tracking-wider">Git Repo</span>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 text-slate-500 shrink-0 select-none">
+        <div className="flex items-center gap-1.5 text-red-400 shrink-0 select-none">
           <AlertCircle className="w-3.5 h-3.5" />
           <span className="font-bold text-[10px] uppercase tracking-wider">Non-Git</span>
         </div>
