@@ -170,7 +170,7 @@ export function getOrCreatePtySession(
     rows: 24,
     cwd: cwd,
     env: ptyEnv,
-    useConpty: true, // Uses modern ConPTY for proper cursor escape sequence passthrough.
+    useConpty: false, // Uses legacy Windows console API to avoid AttachConsole failures.
   }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {
