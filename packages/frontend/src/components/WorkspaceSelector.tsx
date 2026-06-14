@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Folder, GitBranch, Plus, Check, Trash2, AlertCircle, XCircle } from 'lucide-react';
 import { Workspace } from '../App';
 
+const API_BASE = ''; // Empty string for relative URLs (Vite proxy handles routing to backend).
+
 interface WorkspaceSelectorProps {
   workspaces: Workspace[]; // List of registered workspaces.
   activeWorkspaceId?: string; // The ID of the currently active workspace.
@@ -33,7 +35,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       return;
     }
     setIsLoadingGitState(true);
-    fetch(`http://localhost:4000/api/workspaces/${activeWorkspace.id}/git/branches`)
+    fetch(`${API_BASE}/api/workspaces/${activeWorkspace.id}/git/branches`)
       .then(res => {
         if (!res.ok) {
           throw new Error();
@@ -66,7 +68,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   const selectWorkspaceFolder = useCallback(async () => {
     setBrowseError('');
     try {
-      const res = await fetch('http://localhost:4000/api/browse');
+      const res = await fetch(`${API_BASE}/api/browse`);
       const data = await res.json() as { path: string; error?: string };
       if (data?.path) {
         setFolderPath(data.path);

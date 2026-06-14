@@ -1,8 +1,35 @@
 {
-  "name": "omnishell-multiplexer-root",
-  "private": true,
+  "name": "exeggutor",
+  "version": "1.0.0",
+  "description": "Terminal Multiplexer & Git Worktree Manager - local-first workspace coordinator",
+  "private": false,
+  "bin": {
+    "exeggutor": "./bin/exeggutor.js"
+  },
   "workspaces": [
     "packages/backend",
     "packages/frontend"
+  ],
+  "scripts": {
+    "dev": "node bin/exeggutor.js",
+    "dev:backend": "npm run dev -w packages/backend",
+    "dev:frontend": "npm run dev -w packages/frontend",
+    "build": "npm run build -w packages/backend && npm run build -w packages/frontend",
+    "status": "node bin/exeggutor.js --status",
+    "stop": "node bin/exeggutor.js --stop",
+    "start": "node bin/exeggutor.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "packages/backend/dist/",
+    "packages/frontend/dist/",
+    "packages/backend/scripts/",
+    "packages/backend/git-wrapper/",
+    "packages/backend/src/",
+    "packages/frontend/dist/"
   ]
 }

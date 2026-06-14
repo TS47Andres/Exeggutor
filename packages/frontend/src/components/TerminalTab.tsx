@@ -15,11 +15,14 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
   const fitAddonRef = useRef<FitAddon | null>(null); // Reference containing the fit addon instance for managing sizes.
+  const disposedRef = useRef(false); // Flag marking if the terminal was disposed to prevent stale async calls.
 
   useEffect(() => {
     if (!containerRef.current) {
       return;
     }
+
+    disposedRef.current = false;
 
     const term = new Terminal({
       cursorBlink: true,
@@ -54,24 +57,30 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       term.focus();
     } else {
       setTimeout(() => {
-        if (containerRef.current && fitAddonRef.current) {
+        if (containerRef.current && fitAddonRef.current && !disposedRef.current) {
           try { fitAddonRef.current.fit(); } catch (_) {}
         }
       }, 100);
     }
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Computes socket protocol matching current page protocol.
-    const wsHost = window.location.hostname; // Hostname of the current web page.
-    const wsUrl = `${wsProtocol}//${wsHost}:4000/ws/terminal/${tabId}`; // Dynamic target websocket connection URL.
+    const wsHost = window.location.host; // Host:port of the current page (Vite proxy handles routing to backend).
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}`; // Dynamic target websocket connection URL (proxied to backend).
     const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
-      term.write(event.data);
+      if (!disposedRef.current) {
+        try {
+          term.write(event.data);
+        } catch (_) {
+          // Safe write skip after disposal.
+        }
+      }
     };
 
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws.readyState === WebSocket.OPEN && !disposedRef.current) {
         const payload = JSON.stringify({ type: 'input', data }); // Serialized terminal input payload.
         ws.send(payload);
       }
@@ -81,8 +90,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     let lastRows = 0; // Previous rows count to avoid redundant resize messages.
 
     const sendResize = () => {
+      if (disposedRef.current) { return; }
       try {
-        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
+        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) && !disposedRef.current) {
           fitAddon.fit();
           if (term.cols > 0 && term.rows > 0 && (term.cols !== lastCols || term.rows !== lastRows)) {
             lastCols = term.cols;
@@ -104,6 +114,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     ws.onopen = sendResize;
 
     const cleanup = () => {
+      disposedRef.current = true;
       resizeObserver.disconnect();
       ws.onopen = null;
       ws.onclose = null;
@@ -144,9 +155,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
   useEffect(() => {
     const term = termRef.current;
     const fit = fitAddonRef.current;
-    if (term && fit && typeof term.setOption === 'function') {
+    if (term && fit && typeof (term as any).setOption === 'function') {
       try {
-        term.setOption('fontSize', fontSize);
+        (term as any).setOption('fontSize', fontSize);
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
           fit.fit();
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && term.cols > 0 && term.rows > 0) {

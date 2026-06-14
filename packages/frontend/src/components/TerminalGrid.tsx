@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mosaic, MosaicWindow, MosaicNode } from 'react-mosaic-component';
 import { TerminalTab } from './TerminalTab';
-import { Plus, Trash2, LayoutGrid, Split, Check, GitBranch, ChevronDown, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, Trash2, LayoutGrid, Split, Check, GitBranch, ChevronDown, Search, X, Edit3 } from 'lucide-react';
 import { TerminalTab as TabType } from '../App';
 
 interface TerminalGridProps {
@@ -11,14 +11,15 @@ interface TerminalGridProps {
   onChangeLayout: (newLayout: MosaicNode<string> | null) => void; // Callback invoked when windows are rearranged or resized.
   onCloseTab: (tabId: string) => void; // Callback invoked when a terminal tab is closed.
   onAddTab: (name: string, direction?: 'row' | 'column') => void; // Callback invoked to spawn a new terminal tab.
+  onRenameTab: (tabId: string, newName: string) => void; // Callback invoked when a terminal tab is renamed.
   branches: string[]; // List of git branches scanned in the workspace repository.
   isGitRepo: boolean; // Flag marking if the workspace is a valid Git repository.
   onChangeTabBranch: (tabId: string, branch: string) => Promise<void>; // Callback to switch the Git branch/worktree of a terminal tab.
   onCreateTabBranch: (tabId: string, branchName: string) => Promise<void>; // Callback to create and check out a new branch on a terminal tab.
   fontSize: number; // Current terminal font size for zoom level.
-  onZoomIn: () => void; // Increases the terminal font size by 1.
-  onZoomOut: () => void; // Decreases the terminal font size by 1.
-  onZoomReset: () => void; // Resets the terminal font size to the default 13.
+  onZoomIn?: () => void; // Increases the terminal font size by 1 (zoom controls now in header).
+  onZoomOut?: () => void; // Decreases the terminal font size by 1.
+  onZoomReset?: () => void; // Resets the terminal font size to the default 13.
 }
 
 // Recursively removes a target tab ID from a mosaic window layout tree.
@@ -122,7 +123,7 @@ const BranchSelector: React.FC<BranchSelectorProps> = ({
   }; // Submits inline branch creation form and triggers backend worktree checkout.
 
   const selectView = (
-    <div className="relative font-sans text-xs mr-2" ref={dropdownRef} onClick={e => e.stopPropagation()}>
+    <div className="relative font-sans text-xs" ref={dropdownRef} onClick={e => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => {
@@ -133,11 +134,11 @@ const BranchSelector: React.FC<BranchSelectorProps> = ({
             setNewBranchName('');
           }
         }}
-        className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-dark-700/80 border border-dark-700 rounded-md text-slate-300 transition-all select-none shrink-0 font-medium font-sans"
+        className="flex items-center gap-1 px-2 py-1 hover:bg-dark-700/80 border border-dark-700 rounded-md text-slate-300 transition-all select-none shrink-0 font-medium font-sans"
       >
-        <GitBranch className="w-3.5 h-3.5 text-slate-400" />
-        <span className="max-w-[100px] truncate">{activeLabel}</span>
-        <ChevronDown className="w-3 h-3 text-slate-500 shrink-0" />
+        <GitBranch className="w-3 h-3 text-slate-400" />
+        <span className="max-w-[80px] truncate">{activeLabel}</span>
+        <ChevronDown className="w-2.5 h-2.5 text-slate-500 shrink-0" />
       </button>
 
       {isOpen && (
@@ -260,14 +261,12 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   onChangeLayout,
   onCloseTab,
   onAddTab,
+  onRenameTab,
   branches,
   isGitRepo,
   onChangeTabBranch,
   onCreateTabBranch,
   fontSize,
-  onZoomIn,
-  onZoomOut,
-  onZoomReset,
 }) => {
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
 
@@ -301,55 +300,55 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
       />
     ) : null; // Dynamic branch custom dropdown tag.
 
+    const handleRename = () => {
+      const newName = window.prompt('Enter new terminal name:', tabData.name);
+      if (newName && newName.trim() && newName.trim() !== tabData.name) {
+        onRenameTab(id, newName.trim());
+      }
+    }; // Prompts user for a new name and triggers rename.
+
     const tileView = (
       <MosaicWindow<string>
         path={path}
         title={tabData.name}
+        className="group"
         toolbarControls={[
           branchSelector,
-          <button
-            key="split-row"
-            title="Split Horizontally"
-            onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
-            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
-          >
-            <Split className="w-3.5 h-3.5 rotate-90" />
-          </button>,
-          <button
-            key="split-col"
-            title="Split Vertically"
-            onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
-            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
-          >
-            <Split className="w-3.5 h-3.5" />
-          </button>,
-          <button
-            key="zoom-out"
-            title="Zoom Out"
-            onClick={onZoomOut}
-            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>,
-          <span key="zoom-label" className="text-[10px] text-slate-500 font-semibold tabular-nums w-5 text-center">
-            {fontSize}
-          </span>,
-          <button
-            key="zoom-in"
-            title="Zoom In"
-            onClick={onZoomIn}
-            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>,
-          <button
-            key="delete"
-            title="Close Terminal"
-            onClick={() => onCloseTab(id)}
-            className="p-1 text-slate-400 hover:text-neon-red transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>,
+          <div key="toolbar-actions" className="flex items-center gap-1 ml-1">
+            <button
+              key="rename"
+              title="Rename Terminal"
+              onClick={handleRename}
+              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              key="split-row"
+              title="Split Horizontally"
+              onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'row')}
+              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+            >
+              <Split className="w-3.5 h-3.5 rotate-90" />
+            </button>
+            <button
+              key="split-col"
+              title="Split Vertically"
+              onClick={() => onAddTab(`Terminal ${tabs.length + 1}`, 'column')}
+              className="p-1 text-slate-500 hover:text-neon-blue transition-colors"
+            >
+              <Split className="w-3.5 h-3.5" />
+            </button>
+            <div key="sep" className="w-px h-4 bg-dark-700 mx-0.5" />
+            <button
+              key="delete"
+              title="Close Terminal"
+              onClick={() => onCloseTab(id)}
+              className="p-1 text-slate-500 hover:text-neon-red transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>,
         ].filter(Boolean) as React.ReactNode[]}
       >
         <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} fontSize={fontSize} />

@@ -5,6 +5,8 @@ import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
 
+const PORT = parseInt(process.env.EXEGGUTOR_BACKEND_PORT || '17492', 10); // Backend API port from env or default.
+
 const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
 const observerSockets = new Set<any>(); // Registry containing all active WebSocket connections for the observer sidebar.
 
@@ -362,9 +364,8 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  const port = 4000; // API network port to deploy fastify on.
-  await server.listen({ port, host: '0.0.0.0' });
-  console.log(`Backend daemon is listening on port ${port}`);
+  await server.listen({ port: PORT, host: '0.0.0.0' });
+  console.log(`Backend daemon is listening on port ${PORT}`);
 }
 
 bootstrap().catch(err => {

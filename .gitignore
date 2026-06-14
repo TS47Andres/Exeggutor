@@ -32,6 +32,9 @@ sessions.json
 *.sln
 *.swp
 
+# Exeggutor runtime config
+.exeggutor.json
+
 # OS Files
 .DS_Store
 Thumbs.db

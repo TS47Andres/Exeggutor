@@ -5,6 +5,8 @@ import { TerminalGrid, removeTabFromTree, addTabToTree } from './components/Term
 import { Terminal, Layout, Plus, Info } from 'lucide-react';
 import { MosaicNode } from 'react-mosaic-component';
 
+const API_BASE = ''; // Empty string means relative URLs (Vite proxy handles routing to backend).
+
 export interface TerminalTab {
   id: string; // Tab ID.
   name: string; // Tab name.
@@ -36,7 +38,7 @@ function App() {
       setIsGitRepo(false);
       return;
     }
-    fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/git/branches`)
+    fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/git/branches`)
       .then(res => {
         if (!res.ok) {
           throw new Error();
@@ -54,7 +56,7 @@ function App() {
   }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
-    fetch('http://localhost:4000/api/workspaces')
+    fetch(`${API_BASE}/api/workspaces`)
       .then(res => res.json())
       .then((data: Workspace[]) => {
         setWorkspaces(data);
@@ -78,7 +80,7 @@ function App() {
   }; // Selects a different workspace.
 
   const handleCreateWorkspace = async (name: string, path: string) => {
-    const res = await fetch('http://localhost:4000/api/workspaces', {
+    const res = await fetch(`${API_BASE}/api/workspaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, path }),
@@ -95,7 +97,7 @@ function App() {
   }; // Creates a new workspace path.
 
   const handleDeleteWorkspace = async (id: string) => {
-    const res = await fetch(`http://localhost:4000/api/workspaces/${id}`, {
+    const res = await fetch(`${API_BASE}/api/workspaces/${id}`, {
       method: 'DELETE',
     }); // Deletion service response.
     if (res.ok) {
@@ -116,7 +118,7 @@ function App() {
       return;
     }
     setLayout(newLayout);
-    await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}`, {
+    await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ layout: newLayout }),
@@ -128,7 +130,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs`, {
+    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -151,7 +153,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
       method: 'DELETE',
     }); // Terminal process termination request.
     if (res.ok) {
@@ -167,11 +169,32 @@ function App() {
     }
   }; // Closes a terminal tab process.
 
+  const handleRenameTab = async (tabId: string, newName: string) => {
+    if (!activeWorkspaceId) {
+      return;
+    }
+    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    }); // Tab rename endpoint response.
+    if (res.ok) {
+      const updatedTab = await res.json() as TerminalTab; // Server modified tab.
+      setWorkspaces(prev => prev.map(w => {
+        if (w.id === activeWorkspaceId) {
+          const nextTabs = w.tabs.map(t => t.id === tabId ? updatedTab : t); // Updated tabs list.
+          return { ...w, tabs: nextTabs };
+        }
+        return w;
+      }));
+    }
+  }; // Renames a terminal tab.
+
   const handleChangeTabBranch = async (tabId: string, branchName: string) => {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ branch: branchName }),
@@ -195,7 +218,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`http://localhost:4000/api/workspaces/${activeWorkspaceId}/tabs/${tabId}/branches`, {
+    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}/branches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: branchName }),
@@ -282,13 +305,40 @@ function App() {
               <Terminal className="w-4 h-4 text-neon-blue" />
               <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
             </div>
-            <button
-              onClick={() => handleAddTab(`Terminal ${activeWorkspace.tabs.length + 1}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 hover:bg-dark-700/60 border border-dark-700/60 hover:border-dark-700 text-xs font-semibold rounded text-slate-200 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Terminal
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-dark-800 border border-dark-700/60 rounded-lg px-2.5 py-1.5">
+                <button
+                  onClick={handleZoomOut}
+                  className="p-0.5 text-slate-400 hover:text-white transition-colors"
+                  title="Zoom Out"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                </button>
+                <span className="text-xs text-slate-300 font-semibold tabular-nums w-6 text-center">{fontSize}</span>
+                <button
+                  onClick={handleZoomIn}
+                  className="p-0.5 text-slate-400 hover:text-white transition-colors"
+                  title="Zoom In"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                </button>
+                <div className="w-px h-4 bg-dark-700 mx-1" />
+                <button
+                  onClick={handleZoomReset}
+                  className="p-0.5 text-slate-500 hover:text-white transition-colors text-[10px] font-bold"
+                  title="Reset Zoom"
+                >
+                  RST
+                </button>
+              </div>
+              <button
+                onClick={() => handleAddTab(`Terminal ${activeWorkspace.tabs.length + 1}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 hover:bg-dark-700/60 border border-dark-700/60 hover:border-dark-700 text-xs font-semibold rounded text-slate-200 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Terminal
+              </button>
+            </div>
           </div>
         )}
         <TerminalGrid
@@ -298,6 +348,7 @@ function App() {
           onChangeLayout={handleChangeLayout}
           onCloseTab={handleCloseTab}
           onAddTab={handleAddTab}
+          onRenameTab={handleRenameTab}
           branches={branches}
           isGitRepo={isGitRepo}
           onChangeTabBranch={handleChangeTabBranch}
@@ -323,7 +374,6 @@ function App() {
             <h1 className="text-sm font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
               EXEGGUTOR
             </h1>
-
           </div>
         </div>
 
