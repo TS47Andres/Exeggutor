@@ -230,8 +230,8 @@ export function getOrCreatePtySession(
 export function resizePtySession(tabId: string, cols: number, rows: number): void {
   const session = sessions.get(tabId); // Look up session by ID.
   if (session && typeof cols === 'number' && typeof rows === 'number' && cols > 0 && rows > 0) {
-    const parsedCols = Math.floor(cols); // Normalized columns count.
-    const parsedRows = Math.floor(rows); // Normalized rows count.
+    const parsedCols = Math.max(Math.floor(cols), 40); // Ensures PTY size is at least 40 columns wide.
+    const parsedRows = Math.max(Math.floor(rows), 10); // Ensures PTY size is at least 10 rows high.
     if (parsedCols > 0 && parsedRows > 0) {
       session.ptyProcess.resize(parsedCols, parsedRows);
     }

@@ -15,6 +15,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
   const fitAddonRef = useRef<FitAddon | null>(null); // Reference containing the fit addon instance for managing sizes.
   const disposedRef = useRef(false); // Flag marking if the terminal was disposed to prevent stale async calls.
+  const lastColsRef = useRef<number>(0); // Tracks the last successfully sent terminal column dimension.
+  const lastRowsRef = useRef<number>(0); // Tracks the last successfully sent terminal row dimension.
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -50,6 +52,36 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     fitAddonRef.current = fitAddon;
     term.loadAddon(fitAddon);
 
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Computes socket protocol matching current page protocol.
+    const wsHost = window.location.host; // Host:port of the current page (Vite proxy handles routing to backend).
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}`; // Dynamic target websocket connection URL (proxied to backend).
+    const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
+    wsRef.current = ws;
+
+    // Synchronizes the current frontend xterm dimensions with the backend PTY session.
+    const sendResize = () => {
+      if (disposedRef.current) { return; }
+      try {
+        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) && !disposedRef.current) {
+          fitAddon.fit();
+          const finalCols = Math.max(term.cols, 40); // Ensures the terminal is not resized below a minimum of 40 columns.
+          const finalRows = Math.max(term.rows, 10); // Ensures the terminal is not resized below a minimum of 10 rows.
+          if (finalCols > 0 && finalRows > 0) {
+            if (ws.readyState === WebSocket.OPEN) {
+              if (finalCols !== lastColsRef.current || finalRows !== lastRowsRef.current) {
+                lastColsRef.current = finalCols;
+                lastRowsRef.current = finalRows;
+                const dims = { type: 'resize', cols: finalCols, rows: finalRows }; // Serialized dimensions object sent to backend.
+                ws.send(JSON.stringify(dims));
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Safe resize skip.
+      }
+    };
+
     term.open(containerRef.current);
     if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
       try { fitAddon.fit(); } catch (_) { /* Safe initial fit skip. */ }
@@ -58,15 +90,10 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       setTimeout(() => {
         if (containerRef.current && fitAddonRef.current && !disposedRef.current) {
           try { fitAddonRef.current.fit(); } catch (_) {}
+          sendResize();
         }
       }, 100);
     }
-
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Computes socket protocol matching current page protocol.
-    const wsHost = window.location.host; // Host:port of the current page (Vite proxy handles routing to backend).
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}`; // Dynamic target websocket connection URL (proxied to backend).
-    const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
-    wsRef.current = ws;
 
     ws.onmessage = (event) => {
       if (!disposedRef.current) {
@@ -85,29 +112,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     });
 
-    let lastCols = 0; // Previous cols count to avoid redundant resize messages.
-    let lastRows = 0; // Previous rows count to avoid redundant resize messages.
-
-    const sendResize = () => {
-      if (disposedRef.current) { return; }
-      try {
-        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) && !disposedRef.current) {
-          fitAddon.fit();
-          if (term.cols > 0 && term.rows > 0 && (term.cols !== lastCols || term.rows !== lastRows)) {
-            lastCols = term.cols;
-            lastRows = term.rows;
-            if (ws.readyState === WebSocket.OPEN) {
-              const dims = { type: 'resize', cols: term.cols, rows: term.rows };
-              ws.send(JSON.stringify(dims));
-            }
-          }
-        }
-      } catch (err) {
-        // Safe resize skip.
-      }
-    };
-
-    const resizeObserver = new ResizeObserver(sendResize);
+    const resizeObserver = new ResizeObserver(sendResize); // Observation controller notifying on layout changes.
     resizeObserver.observe(containerRef.current);
 
     ws.onopen = sendResize;
@@ -140,8 +145,14 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
         if (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) {
           fitAddonRef.current.fit();
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current && termRef.current.cols > 0 && termRef.current.rows > 0) {
-            const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows };
-            wsRef.current.send(JSON.stringify(dims));
+            const finalCols = Math.max(termRef.current.cols, 40); // Ensures a minimum columns count is maintained on tab activation.
+            const finalRows = Math.max(termRef.current.rows, 10); // Ensures a minimum rows count is maintained on tab activation.
+            if (finalCols !== lastColsRef.current || finalRows !== lastRowsRef.current) {
+              lastColsRef.current = finalCols;
+              lastRowsRef.current = finalRows;
+              const dims = { type: 'resize', cols: finalCols, rows: finalRows }; // Serialized dimensions object sent to backend.
+              wsRef.current.send(JSON.stringify(dims));
+            }
           }
         }
       } catch (err) {
