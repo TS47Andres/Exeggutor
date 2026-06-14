@@ -59,6 +59,8 @@
 
 .mosaic-blueprint-theme .mosaic-window-body .xterm-viewport {
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
 }
 
 .mosaic-blueprint-theme .mosaic-split {

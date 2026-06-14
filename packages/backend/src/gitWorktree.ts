@@ -1,6 +1,7 @@
 import { exec, spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 // Helper function that executes a terminal command asynchronously and returns its stdout.
 export function execAsync(command: string, cwd: string): Promise<string> {
@@ -120,62 +121,91 @@ export async function createBranch(repoPath: string, branchName: string): Promis
   await execAsync(`git branch "${branchName}"`, resolvedRepo);
 }
 
-// Spawns the compiled native folder picker binary (FolderPicker.exe).
-// Uses .NET OpenFileDialog (modern Vista-style IFileOpenDialog on Win10/11).
-// No PowerShell, no cmd.exe, no shell launching involved.
+// Opens a native folder picker dialog using platform-specific tools.
+// Windows: compiled FolderPicker.exe (C#/.NET) using IFileOpenDialog.
+// macOS: osascript with choose folder AppleScript command.
+// Linux: zenity --file-selection, with kdialog as a fallback.
 export async function showFolderPicker(): Promise<string> {
-  const binaryPath = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
-  const resolvedPath = path.resolve(binaryPath);
+  const platform = os.platform();
 
-  console.log(`[showFolderPicker] __dirname=${__dirname}`);
-  console.log(`[showFolderPicker] binaryPath=${resolvedPath}`);
-  console.log(`[showFolderPicker] binary exists=${fs.existsSync(resolvedPath)}`);
+  if (platform === 'win32') {
+    const binaryPath = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
+    const resolvedPath = path.resolve(binaryPath);
 
-  if (!fs.existsSync(resolvedPath)) {
-    throw new Error(
-      `Native folder picker not available (not found at ${resolvedPath}). ` +
-      'Run the compile script (npm run compile-picker) to build it, ' +
-      'or type the workspace path manually.'
-    );
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(
+        `Native folder picker not available (not found at ${resolvedPath}). ` +
+        'Run the compile script (npm run compile-picker) to build it, ' +
+        'or type the workspace path manually.'
+      );
+    }
+
+    return new Promise<string>((resolve, reject) => {
+      const child = spawn(resolvedPath, [], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: false,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code: number | null) => {
+        if (code === 0) {
+          resolve(stdout.trim());
+        } else {
+          const errMsg = stderr.trim() || `Folder picker exited with code ${code}`;
+          reject(new Error(errMsg));
+        }
+      });
+
+      child.on('error', (err: Error) => {
+        reject(new Error(`Failed to launch folder picker: ${err.message}`));
+      });
+    });
   }
 
-  return new Promise<string>((resolve, reject) => {
-    console.log(`[showFolderPicker] spawning...`);
-    const child = spawn(resolvedPath, [], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: false,
-    });
+  if (platform === 'darwin') {
+    try {
+      const result = await execAsync(
+        'osascript -e \'POSIX path of (choose folder with prompt "Select workspace folder")\'',
+        __dirname
+      );
+      return result;
+    } catch (err: any) {
+      throw new Error(
+        'Failed to open macOS folder picker: ' + (err.message || 'unknown error') + '. ' +
+        'Type the workspace path manually.'
+      );
+    }
+  }
 
-    let stdout = '';
-    let stderr = '';
-
-    child.on('spawn', () => {
-      console.log(`[showFolderPicker] process spawned, pid=${child.pid}`);
-    });
-
-    child.stdout.on('data', (data: Buffer) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on('data', (data: Buffer) => {
-      stderr += data.toString();
-    });
-
-    child.on('close', (code: number | null) => {
-      if (code === 0) {
-        const trimmed = stdout.trim();
-        console.log(`[showFolderPicker] success, path="${trimmed}"`);
-        resolve(trimmed);
-      } else {
-        const errMsg = stderr.trim() || `Folder picker exited with code ${code}`;
-        console.error(`[showFolderPicker] failed: ${errMsg}`);
-        reject(new Error(errMsg));
-      }
-    });
-
-    child.on('error', (err: Error) => {
-      console.error(`[showFolderPicker] spawn error: ${err.message}`);
-      reject(new Error(`Failed to launch folder picker: ${err.message}`));
-    });
-  });
+  // Linux and other Unix platforms.
+  try {
+    const result = await execAsync(
+      'zenity --file-selection --directory --title="Select workspace folder"',
+      __dirname
+    );
+    return result;
+  } catch (err1: any) {
+    try {
+      const result = await execAsync(
+        'kdialog --getexistingdirectory --title="Select workspace folder"',
+        __dirname
+      );
+      return result;
+    } catch (err2: any) {
+      throw new Error(
+        'Folder picker not available. Install zenity or kdialog, ' +
+        'or type the workspace path manually.'
+      );
+    }
+  }
 }
