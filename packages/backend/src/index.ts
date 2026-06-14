@@ -1,11 +1,15 @@
 import fastify, { FastifyInstance } from 'fastify';
 import fastifyCors from '@fastify/cors';
 import fastifyWebsocket from '@fastify/websocket';
+import fastifyStatic from '@fastify/static';
+import * as path from 'path';
+import * as fs from 'fs';
 import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
 
 const PORT = parseInt(process.env.EXEGGUTOR_BACKEND_PORT || '17492', 10); // Backend API port from env or default.
+const FRONTEND_DIST = process.env.EXEGGUTOR_FRONTEND_DIST || ''; // Path to built frontend dist/ folder.
 
 const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
 const observerSockets = new Set<any>(); // Registry containing all active WebSocket connections for the observer sidebar.
@@ -29,6 +33,28 @@ function broadcastObserverUpdate(): void {
 async function bootstrap(): Promise<void> {
   await server.register(fastifyCors, { origin: true });
   await server.register(fastifyWebsocket);
+
+  // Serve built frontend statically when EXEGGUTOR_FRONTEND_DIST is set (production mode).
+  if (FRONTEND_DIST && fs.existsSync(FRONTEND_DIST)) {
+    await server.register(fastifyStatic, {
+      root: FRONTEND_DIST,
+      wildcard: false,
+      prefix: '/',
+    });
+    // SPA fallback: serve index.html for all non-API, non-WS routes.
+    server.setNotFoundHandler((request, reply) => {
+      if (request.url.startsWith('/api') || request.url.startsWith('/ws')) {
+        reply.status(404).send({ error: 'Not found' });
+      } else {
+        const indexPath = path.join(FRONTEND_DIST, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          reply.type('text/html').send(fs.readFileSync(indexPath, 'utf8'));
+        } else {
+          reply.status(404).send('Not found');
+        }
+      }
+    });
+  }
 
   pty.startStatusAuditor(broadcastObserverUpdate);
 

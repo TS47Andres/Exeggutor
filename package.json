@@ -6,15 +6,12 @@
   "bin": {
     "exeggutor": "./bin/exeggutor.js"
   },
-  "workspaces": [
-    "packages/backend",
-    "packages/frontend"
-  ],
   "scripts": {
     "dev": "node bin/exeggutor.js",
-    "dev:backend": "npm run dev -w packages/backend",
-    "dev:frontend": "npm run dev -w packages/frontend",
-    "build": "npm run build -w packages/backend && npm run build -w packages/frontend",
+    "dev:backend": "cd packages/backend && npm run dev",
+    "dev:frontend": "cd packages/frontend && npm run dev",
+    "build": "cd packages/backend && npm run build && cd ../.. && cd packages/frontend && npm run build",
+    "prepublishOnly": "npm run build",
     "status": "node bin/exeggutor.js --status",
     "stop": "node bin/exeggutor.js --stop",
     "start": "node bin/exeggutor.js"
@@ -25,11 +22,13 @@
   "files": [
     "bin/",
     "src/",
+    "packages/backend/package.json",
     "packages/backend/dist/",
-    "packages/frontend/dist/",
     "packages/backend/scripts/",
     "packages/backend/git-wrapper/",
+    "packages/backend/native/",
     "packages/backend/src/",
+    "packages/frontend/package.json",
     "packages/frontend/dist/"
   ]
 }

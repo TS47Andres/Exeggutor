@@ -72,19 +72,16 @@ Notes:
 async function handleStartServers(root, configPath, extraArgs) {
   const config = loadConfig(configPath);
 
-  // Resolve ports
+  // Resolve port
   const backendPort = config.backendPort || await findAvailablePort(17492);
-  const frontendPort = config.frontendPort || await findAvailablePort(17493);
 
-  // Save ports to config so frontend/backend env vars are consistent
+  // Save port to config for consistency
   config.backendPort = backendPort;
-  config.frontendPort = frontendPort;
   config.root = root;
   saveConfig(configPath, config);
 
   console.log(`Starting Exeggutor...`);
-  console.log(`  Backend port: ${backendPort}`);
-  console.log(`  Frontend port: ${frontendPort}`);
+  console.log(`  Port: ${backendPort}`);
 
   // Set up log directory
   const logDir = resolve(require('os').homedir(), '.exeggutor-logs');
@@ -99,9 +96,8 @@ async function handleStartServers(root, configPath, extraArgs) {
     process.exit(1);
   }
 
-  console.log(`Backend PID: ${result.backendPid}`);
-  console.log(`Frontend PID: ${result.frontendPid}`);
-  console.log(`Dashboard: http://localhost:${frontendPort}`);
+  console.log(`PID: ${result.backendPid}`);
+  console.log(`Dashboard: http://localhost:${backendPort}`);
   console.log('Logs: ~/.exeggutor-logs/');
   console.log('Use "exeggutor --stop" to stop all servers.');
   console.log('Use "exeggutor --open" to open in browser.');
@@ -112,7 +108,6 @@ function stopServersCmd(configPath) {
   const config = loadConfig(configPath);
   stopServers(config);
   config.backendPid = undefined;
-  config.frontendPid = undefined;
   saveConfig(configPath, config);
   console.log('All servers stopped.');
 }
@@ -137,30 +132,16 @@ async function showStatus(configPath) {
   try {
     const alive = await pingBackend(backendPort);
     if (alive) {
-      console.log(`Backend server: RUNNING (port ${backendPort})`);
+      console.log(`Exeggutor: RUNNING (port ${backendPort})`);
     } else {
-      console.log(`Backend server: STOPPED`);
+      console.log(`Exeggutor: STOPPED`);
     }
   } catch {
-    console.log('Backend server: STOPPED');
+    console.log('Exeggutor: STOPPED');
   }
 
-  // Check frontend
-  const frontendPort = config.frontendPort || 17493;
-  try {
-    const alive = await pingBackend(frontendPort);
-    if (alive) {
-      console.log(`Frontend server: RUNNING (port ${frontendPort})`);
-    } else {
-      console.log(`Frontend server: STOPPED`);
-    }
-  } catch {
-    console.log('Frontend server: STOPPED');
-  }
-
-  // PIDs
-  if (config.backendPid) console.log(`Backend PID: ${config.backendPid}`);
-  if (config.frontendPid) console.log(`Frontend PID: ${config.frontendPid}`);
+  // PID
+  if (config.backendPid) console.log(`PID: ${config.backendPid}`);
 
   console.log('');
 
@@ -190,7 +171,7 @@ async function showStatus(configPath) {
 // Opens the dashboard in the default browser.
 function openDashboard(configPath) {
   const config = loadConfig(configPath);
-  const port = config.frontendPort || 17493;
+  const port = config.backendPort || 17492;
   const url = `http://localhost:${port}`;
 
   const platform = process.platform;

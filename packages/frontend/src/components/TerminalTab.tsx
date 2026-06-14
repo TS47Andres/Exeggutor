@@ -6,11 +6,10 @@ interface TerminalTabProps {
   workspaceId: string; // The ID of the parent workspace owning the tab.
   tabId: string; // The unique ID of this terminal session tab.
   isActive: boolean; // Flag to indicate if this terminal window is currently focused.
-  fontSize: number; // Current font size for the terminal display.
 }
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
-export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive, fontSize }) => {
+export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
@@ -28,7 +27,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       cursorBlink: true,
       cursorStyle: 'block',
       scrollback: 5000,
-      fontSize: fontSize,
+      fontSize: 13,
       fontFamily: 'JetBrains Mono, monospace',
       theme: {
         background: '#000000',
@@ -151,25 +150,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     }
   }, [isActive]);
 
-  // Updates the terminal font size and re-fits when the zoom level changes.
-  useEffect(() => {
-    const term = termRef.current;
-    const fit = fitAddonRef.current;
-    if (term && fit && typeof (term as any).setOption === 'function') {
-      try {
-        (term as any).setOption('fontSize', fontSize);
-        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
-          fit.fit();
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && term.cols > 0 && term.rows > 0) {
-            const dims = { type: 'resize', cols: term.cols, rows: term.rows };
-            wsRef.current.send(JSON.stringify(dims));
-          }
-        }
-      } catch (err) {
-        // Safe resize skip.
-      }
-    }
-  }, [fontSize]);
+
 
   const view = (
     <div className="w-full h-full bg-dark-900 relative">

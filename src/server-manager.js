@@ -1,11 +1,15 @@
 // Exeggutor Server Manager.
-// Handles starting and stopping the backend and frontend server processes
-// as detached child processes with proper environment variables.
+// Starts the backend process as a truly detached background service.
+// On Windows, uses a VBS launcher to avoid job-object child killing.
+// On Unix, uses standard spawn with detached.
 
-const { spawn, execSync } = require('child_process');
-const { existsSync, appendFileSync, writeFileSync, mkdirSync } = require('fs');
+const { spawn, execSync, exec } = require('child_process');
+const { existsSync, writeFileSync } = require('fs');
 const { resolve } = require('path');
 const { createServer } = require('net');
+const os = require('os');
+
+const IS_WIN = process.platform === 'win32';
 
 // Finds the first available port starting from the preferred port.
 function findAvailablePort(preferred) {
@@ -16,7 +20,6 @@ function findAvailablePort(preferred) {
         server.close(() => resolve(port));
       });
       server.on('error', () => {
-        // Port in use, try next
         tryPort(port + 1);
       });
     };
@@ -24,126 +27,149 @@ function findAvailablePort(preferred) {
   });
 }
 
-// Starts the backend and frontend servers as detached child processes.
-// Returns { backendPid, frontendPid } or null on failure.
-function startServers(root, config, logDir) {
-  const backendPort = config.backendPort || 17492;
-  const frontendPort = config.frontendPort || 17493;
-  const backendPath = resolve(root, 'packages', 'backend');
-  const frontendPath = resolve(root, 'packages', 'frontend');
-
-  // Ensure node_modules are installed
-  if (!existsSync(resolve(backendPath, 'node_modules'))) {
-    console.log('Installing backend dependencies...');
-    execSync('npm install', { cwd: backendPath, stdio: 'inherit' });
-  }
-  if (!existsSync(resolve(frontendPath, 'node_modules'))) {
-    console.log('Installing frontend dependencies...');
-    execSync('npm install', { cwd: frontendPath, stdio: 'inherit' });
-  }
-
-  const backendLog = resolve(logDir, 'backend.log');
-  const frontendLog = resolve(logDir, 'frontend.log');
-
-  // Ensure log files exist
-  if (!existsSync(backendLog)) writeFileSync(backendLog, '', 'utf8');
-  if (!existsSync(frontendLog)) writeFileSync(frontendLog, '', 'utf8');
-
-  const env = {
-    ...process.env,
-    EXEGGUTOR_BACKEND_PORT: String(backendPort),
-    EXEGGUTOR_FRONTEND_PORT: String(frontendPort),
-  };
-
-  // Start backend (use compiled dist/index.js if available, else ts-node-dev)
-  const backendCompiled = resolve(backendPath, 'dist', 'index.js');
-  const backendProcess = (existsSync(backendCompiled))
-    ? spawn(process.execPath, [backendCompiled], {
-        cwd: backendPath,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        windowsHide: true,
-      })
-    : spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['ts-node-dev', '--respawn', '--transpile-only', 'src/index.ts'], {
-        cwd: backendPath,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        windowsHide: true,
-      });
-
-  const backendStream = require('fs').createWriteStream(backendLog, { flags: 'a' });
-  backendProcess.stdout.pipe(backendStream);
-  backendProcess.stderr.pipe(backendStream);
-
-  backendProcess.unref();
-
-  config.backendPid = backendProcess.pid;
-
-  // Start frontend (use Vite preview if dist/ exists, else dev server)
-  const frontendDist = resolve(frontendPath, 'dist');
-  const frontendProcess = (existsSync(resolve(frontendDist, 'index.html')))
-    ? spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', 'preview', '--port', String(frontendPort), '--strictPort'], {
-        cwd: frontendPath,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        windowsHide: true,
-      })
-    : spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', '--port', String(frontendPort)], {
-        cwd: frontendPath,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        windowsHide: true,
-      });
-
-  const frontendStream = require('fs').createWriteStream(frontendLog, { flags: 'a' });
-  frontendProcess.stdout.pipe(frontendStream);
-  frontendProcess.stderr.pipe(frontendStream);
-
-  frontendProcess.unref();
-
-  config.frontendPid = frontendProcess.pid;
-
-  return { backendPid: backendProcess.pid, frontendPid: frontendProcess.pid };
+// Resolves the JS entry for the backend process.
+function resolveBackendPath(backendPath) {
+  const compiled = resolve(backendPath, 'dist', 'index.js');
+  if (existsSync(compiled)) return compiled;
+  const tsNodeEntry = resolve(backendPath, 'node_modules', 'ts-node-dev', 'lib', 'bin.js');
+  if (existsSync(tsNodeEntry)) return tsNodeEntry;
+  return null;
 }
 
-// Stops all running servers using the stored PIDs.
-function stopServers(config) {
-  const backendPid = config.backendPid;
-  const frontendPid = config.frontendPid;
+// Starts the backend server as a detached background process.
+function startServers(root, config, logDir) {
+  const backendPort = config.backendPort || 17492;
+  const backendPath = resolve(root, 'packages', 'backend');
 
-  const platform = process.platform;
-
-  const kill = (pid, label) => {
-    if (!pid) return;
+  // Ensure backend dependencies are installed
+  if (!existsSync(resolve(backendPath, 'node_modules'))) {
+    console.log('Installing dependencies...');
     try {
-      if (platform === 'win32') {
+      execSync('npm install', { cwd: backendPath, stdio: 'inherit', shell: IS_WIN, timeout: 120000 });
+    } catch (err) {
+      console.error('Install failed:', err.message);
+      return null;
+    }
+  }
+
+  const entry = resolveBackendPath(backendPath);
+  if (!entry) {
+    console.error('Backend entry not found. Run "npm install" in packages/backend.');
+    return null;
+  }
+
+  const backendArgs = entry.endsWith('bin.js')
+    ? ['--respawn', '--transpile-only', 'src/index.ts']
+    : [];
+
+  const env = { // Custom environment variables mapping configuration parameters passed to the backend daemon.
+    ...process.env,
+    EXEGGUTOR_BACKEND_PORT: String(backendPort),
+    EXEGGUTOR_FRONTEND_DIST: resolve(root, 'packages', 'frontend', 'dist'),
+  };
+
+  const backendLog = resolve(logDir, 'backend.log');
+  if (!existsSync(backendLog)) writeFileSync(backendLog, '', 'utf8');
+
+  let child;
+
+  if (IS_WIN) {
+    // Windows: write a batch script to execute node with redirection,
+    // then use VBS script to run it hidden and detached.
+    const batPath = resolve(os.tmpdir(), 'exeggutor-launch.bat'); // Absolute path to the temporary launcher batch script.
+    const batContent = `@echo off\n"${process.execPath}" "${entry}" ${backendArgs.join(' ')} >> "${backendLog}" 2>&1`; // Command execution content redirecting logs.
+    writeFileSync(batPath, batContent, 'utf8');
+
+    const vbsScript = `
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "cmd.exe /c ""${batPath}""", 0, False
+`; // Script block running the launcher batch file hidden.
+    const vbsPath = resolve(os.tmpdir(), 'exeggutor-launch.vbs'); // Absolute path to the temporary VBScript launcher file.
+    writeFileSync(vbsPath, vbsScript.trim(), 'utf8');
+    const { exec: execCmd } = require('child_process'); // Reference to child_process exec function.
+    execCmd(`start /b "" wscript.exe "${vbsPath}"`, {
+      windowsHide: true,
+      env,
+    }); // Launches wscript using the Windows start command to break away from the job object.
+    // Wait a moment for the backend to start, then try to find its PID via netstat
+    config.backendPid = null; // Will be populated if we can detect it
+    // Try to find the PID by scanning port
+    setTimeout(() => {
+      try {
+        const result = execSync(`netstat -ano | findstr ":${backendPort}"`, { encoding: 'utf8', timeout: 5000 });
+        const lines = result.trim().split('\n').filter(l => l.includes('LISTENING'));
+        if (lines.length > 0) {
+          const parts = lines[0].trim().split(/\s+/);
+          const pid = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(pid) && pid > 0) {
+            config.backendPid = pid;
+            // Persist the discovered PID
+            const fs2 = require('fs');
+            const cfgPath = resolve(os.homedir(), '.exeggutor.json');
+            try {
+              const cfg = JSON.parse(fs2.readFileSync(cfgPath, 'utf8'));
+              cfg.backendPid = pid;
+              fs2.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf8');
+            } catch {}
+          }
+        }
+      } catch {}
+    }, 3000);
+
+    return { backendPid: null, frontendPid: null };
+  }
+
+  // Unix: standard detached spawn
+  child = spawn(process.execPath, [entry, ...backendArgs], {
+    cwd: backendPath,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+
+  const fs = require('fs');
+  const stream = fs.createWriteStream(backendLog, { flags: 'a' });
+  if (child.stdout) child.stdout.pipe(stream);
+  if (child.stderr) child.stderr.pipe(stream);
+  child.unref();
+
+  config.backendPid = child.pid;
+  return { backendPid: child.pid, frontendPid: null };
+}
+
+// Stops the backend server.
+function stopServers(config) {
+  const pid = config.backendPid;
+  if (pid) {
+    try {
+      if (IS_WIN) {
         execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
       } else {
         execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
       }
-      console.log(`Stopped ${label} (PID ${pid})`);
-    } catch (err) {
-      // Process may already be dead
-      console.log(`(${label} PID ${pid} already stopped)`);
-    }
-  };
-
-  // Kill backend, then any orphaned node processes on the backend port
-  kill(backendPid, 'Backend');
-
-  // Kill frontend, then any orphaned vite processes on the frontend port
-  kill(frontendPid, 'Frontend');
-
-  // Fallback: kill any remaining node/vite processes related to this project
+      console.log(`Stopped Exeggutor (PID ${pid})`);
+      return;
+    } catch {}
+  }
+  // Fallback: kill any process on our port
   try {
-    if (platform === 'win32') {
-      execSync(`taskkill /F /IM node.exe /T 2>nul`, { stdio: 'ignore' });
+    if (IS_WIN) {
+      const result = execSync(`netstat -ano | findstr ":${config.backendPort || 17492}"`, { encoding: 'utf8', timeout: 5000 });
+      const lines = result.trim().split('\n').filter(l => l.includes('LISTENING'));
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const foundPid = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(foundPid)) {
+          execSync(`taskkill /F /PID ${foundPid}`, { stdio: 'ignore' });
+          console.log(`Stopped Exeggutor (PID ${foundPid})`);
+        }
+      }
+    } else {
+      execSync(`lsof -ti:${config.backendPort || 17492} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
     }
-  } catch { /* ok */ }
+  } catch {
+    console.log('(No running Exeggutor server found)');
+  }
 }
 
 module.exports = { startServers, stopServers, findAvailablePort };

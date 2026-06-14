@@ -30,7 +30,6 @@ function App() {
   const [layout, setLayout] = useState<MosaicNode<string> | null>(null); // Current mosaic panel configuration tree.
   const [branches, setBranches] = useState<string[]>([]); // Dynamic list of scanned branches in the active workspace repository.
   const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
-  const [fontSize, setFontSize] = useState(13); // Current terminal font size for zoom control.
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -238,37 +237,7 @@ function App() {
     }));
   }; // Spawns branch for a tab.
 
-  const handleZoomIn = () => {
-    setFontSize(prev => Math.min(prev + 1, 28));
-  }; // Increases terminal font size.
 
-  const handleZoomOut = () => {
-    setFontSize(prev => Math.max(prev - 1, 8));
-  }; // Decreases terminal font size.
-
-  const handleZoomReset = () => {
-    setFontSize(13);
-  }; // Resets terminal font size to default.
-
-  // Global keyboard shortcuts for zoom control.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          handleZoomIn();
-        } else if (e.key === '-') {
-          e.preventDefault();
-          handleZoomOut();
-        } else if (e.key === '0') {
-          e.preventDefault();
-          handleZoomReset();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   const renderDashboard = () => {
     if (!activeWorkspace) {
@@ -306,31 +275,6 @@ function App() {
               <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 bg-dark-800 border border-dark-700/60 rounded-lg px-2.5 py-1.5">
-                <button
-                  onClick={handleZoomOut}
-                  className="p-0.5 text-slate-400 hover:text-white transition-colors"
-                  title="Zoom Out"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-                </button>
-                <span className="text-xs text-slate-300 font-semibold tabular-nums w-6 text-center">{fontSize}</span>
-                <button
-                  onClick={handleZoomIn}
-                  className="p-0.5 text-slate-400 hover:text-white transition-colors"
-                  title="Zoom In"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                </button>
-                <div className="w-px h-4 bg-dark-700 mx-1" />
-                <button
-                  onClick={handleZoomReset}
-                  className="p-0.5 text-slate-500 hover:text-white transition-colors text-[10px] font-bold"
-                  title="Reset Zoom"
-                >
-                  RST
-                </button>
-              </div>
               <button
                 onClick={() => handleAddTab(`Terminal ${activeWorkspace.tabs.length + 1}`)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-800 hover:bg-dark-700/60 border border-dark-700/60 hover:border-dark-700 text-xs font-semibold rounded text-slate-200 transition-colors"
@@ -353,10 +297,6 @@ function App() {
           isGitRepo={isGitRepo}
           onChangeTabBranch={handleChangeTabBranch}
           onCreateTabBranch={handleCreateTabBranch}
-          fontSize={fontSize}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onZoomReset={handleZoomReset}
         />
       </div>
     ); // Main layouts mapping grid and terminals.

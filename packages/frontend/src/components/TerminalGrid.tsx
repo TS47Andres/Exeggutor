@@ -16,10 +16,6 @@ interface TerminalGridProps {
   isGitRepo: boolean; // Flag marking if the workspace is a valid Git repository.
   onChangeTabBranch: (tabId: string, branch: string) => Promise<void>; // Callback to switch the Git branch/worktree of a terminal tab.
   onCreateTabBranch: (tabId: string, branchName: string) => Promise<void>; // Callback to create and check out a new branch on a terminal tab.
-  fontSize: number; // Current terminal font size for zoom level.
-  onZoomIn?: () => void; // Increases the terminal font size by 1 (zoom controls now in header).
-  onZoomOut?: () => void; // Decreases the terminal font size by 1.
-  onZoomReset?: () => void; // Resets the terminal font size to the default 13.
 }
 
 // Recursively removes a target tab ID from a mosaic window layout tree.
@@ -266,7 +262,6 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   isGitRepo,
   onChangeTabBranch,
   onCreateTabBranch,
-  fontSize,
 }) => {
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
 
@@ -351,7 +346,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           </div>,
         ].filter(Boolean) as React.ReactNode[]}
       >
-        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} fontSize={fontSize} />
+        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} />
       </MosaicWindow>
     ); // The rendered tile with toolbars.
     return tileView;
