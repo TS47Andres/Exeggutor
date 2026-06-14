@@ -2,13 +2,22 @@ import * as pty from 'node-pty';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import { spawn, exec } from 'child_process';
 import * as db from './workspaceDb'; // Reference to local sessions JSON database.
+
+export interface ProcessHandle {
+  pid: number;
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+  onData(callback: (data: string) => void): void;
+  onExit(callback: (result: { exitCode: number }) => void): void;
+}
 
 export interface TerminalSession {
   id: string; // The unique tab ID associated with this terminal process.
   workspaceId: string; // The ID of the workspace that owns this session.
-  ptyProcess: pty.IPty; // The live node-pty process instance.
+  ptyProcess: ProcessHandle; // The live process instance.
   outputBuffer: string[]; // Accumulated recent terminal output lines.
   lastOutputTime: number; // Unix timestamp of the last stdout chunk received.
   status: 'Active' | 'Waiting' | 'Idle' | 'Errored'; // Real-time state of the terminal process.
@@ -16,6 +25,34 @@ export interface TerminalSession {
   onData: (data: string) => void; // Event dispatcher callback for new stdout streams.
   activeSocket?: any; // The active WebSocket connection associated with this session.
   broadcastCallback?: () => void; // Optional callback to notify observer of state changes.
+}
+
+// Spawns a Windows shell process via child_process with windowsHide: true to avoid the OS console window flash.
+function spawnWindowsProcess(shell: string, args: string[], cwd: string, env: Record<string, string>): ProcessHandle {
+  const child = spawn(shell, args, {
+    cwd,
+    env,
+    windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  let onDataCb: ((data: string) => void) | null = null;
+  let onExitCb: ((result: { exitCode: number }) => void) | null = null;
+  child.stdout.on('data', (chunk: Buffer) => {
+    if (onDataCb) onDataCb(chunk.toString());
+  });
+  child.on('exit', (code) => {
+    if (onExitCb) onExitCb({ exitCode: code ?? 0 });
+  });
+  return {
+    pid: child.pid || 0,
+    write(data: string) { child.stdin.write(data); },
+    resize(cols: number, rows: number) {
+      child.stdin.write(`try{[Console]::BufferWidth=${Math.max(cols,40)};[Console]::WindowWidth=${Math.max(cols,40)};[Console]::WindowHeight=${Math.max(rows,10)}}catch{}\n`);
+    },
+    kill() { child.kill(); },
+    onData(cb) { onDataCb = cb; },
+    onExit(cb) { onExitCb = cb; },
+  };
 }
 
 const sessions = new Map<string, TerminalSession>(); // Global map cache linking tab IDs to their active persistent TerminalSessions.
@@ -165,15 +202,16 @@ export function getOrCreatePtySession(
     }
   }
 
-  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
-    name: 'xterm-256color',
-    cols: 80,
-    rows: 24,
-    cwd: cwd,
-    env: ptyEnv,
-    useConpty: true, // Enables the Windows Pseudo Console API for accurate dimension resizes.
-    useConptyDll: true, // Uses the bundled conpty.dll/OpenConsole.exe to avoid window flash.
-  }); // Spawn the process via node-pty.
+  // On Windows, use child_process.spawn with windowsHide: true to avoid the OS console window flash.
+  const ptyProcess: ProcessHandle = isWin
+    ? spawnWindowsProcess(targetShell, ptyArgs, cwd, ptyEnv)
+    : pty.spawn(targetShell, ptyArgs, {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd: cwd,
+        env: ptyEnv,
+      }); // Spawn the process via node-pty on non-Windows.
 
   const newSession: TerminalSession = {
     id: tabId,
