@@ -6,10 +6,11 @@ interface TerminalTabProps {
   workspaceId: string; // The ID of the parent workspace owning the tab.
   tabId: string; // The unique ID of this terminal session tab.
   isActive: boolean; // Flag to indicate if this terminal window is currently focused.
+  fontSize: number; // Current font size for the terminal display.
 }
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
-export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
+export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive, fontSize }) => {
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
@@ -23,8 +24,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
-      cursorInactiveStyle: 'bar',
-      fontSize: 13,
+      scrollback: 5000,
+      fontSize: fontSize,
       fontFamily: 'JetBrains Mono, monospace',
       theme: {
         background: '#000000',
@@ -76,28 +77,20 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     });
 
-    const resizeObserver = new ResizeObserver(() => {
-      try {
-        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
-          fitAddon.fit();
-          if (ws.readyState === WebSocket.OPEN && term.cols > 0 && term.rows > 0) {
-            const dims = { type: 'resize', cols: term.cols, rows: term.rows }; // Resizing details to transmit.
-            ws.send(JSON.stringify(dims));
-          }
-        }
-      } catch (err) {
-        // Safe resize skip.
-      }
-    }); // Listens to dimension shifts on the viewport wrapper.
-    resizeObserver.observe(containerRef.current);
+    let lastCols = 0; // Previous cols count to avoid redundant resize messages.
+    let lastRows = 0; // Previous rows count to avoid redundant resize messages.
 
-    ws.onopen = () => {
+    const sendResize = () => {
       try {
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
           fitAddon.fit();
-          if (term.cols > 0 && term.rows > 0) {
-            const dims = { type: 'resize', cols: term.cols, rows: term.rows }; // Initial resizing layout data.
-            ws.send(JSON.stringify(dims));
+          if (term.cols > 0 && term.rows > 0 && (term.cols !== lastCols || term.rows !== lastRows)) {
+            lastCols = term.cols;
+            lastRows = term.rows;
+            if (ws.readyState === WebSocket.OPEN) {
+              const dims = { type: 'resize', cols: term.cols, rows: term.rows };
+              ws.send(JSON.stringify(dims));
+            }
           }
         }
       } catch (err) {
@@ -105,11 +98,16 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     };
 
+    const resizeObserver = new ResizeObserver(sendResize);
+    resizeObserver.observe(containerRef.current);
+
+    ws.onopen = sendResize;
+
     const cleanup = () => {
       resizeObserver.disconnect();
       ws.close();
       term.dispose();
-    }; // Internal cleanup function.
+    };
     return cleanup;
   }, [tabId, workspaceId]);
 
@@ -119,7 +117,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
         if (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) {
           fitAddonRef.current.fit();
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current && termRef.current.cols > 0 && termRef.current.rows > 0) {
-            const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows }; // Focused resize dimensions.
+            const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows };
             wsRef.current.send(JSON.stringify(dims));
           }
         }
@@ -128,6 +126,24 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     }
   }, [isActive]);
+
+  // Updates the terminal font size and re-fits when the zoom level changes.
+  useEffect(() => {
+    if (termRef.current && fitAddonRef.current) {
+      termRef.current.setOption('fontSize', fontSize);
+      try {
+        if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
+          fitAddonRef.current.fit();
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && termRef.current && termRef.current.cols > 0 && termRef.current.rows > 0) {
+            const dims = { type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows };
+            wsRef.current.send(JSON.stringify(dims));
+          }
+        }
+      } catch (err) {
+        // Safe resize skip.
+      }
+    }
+  }, [fontSize]);
 
   const view = (
     <div className="w-full h-full bg-dark-900 relative">

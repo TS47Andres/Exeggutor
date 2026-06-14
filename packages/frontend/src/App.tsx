@@ -28,6 +28,7 @@ function App() {
   const [layout, setLayout] = useState<MosaicNode<string> | null>(null); // Current mosaic panel configuration tree.
   const [branches, setBranches] = useState<string[]>([]); // Dynamic list of scanned branches in the active workspace repository.
   const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
+  const [fontSize, setFontSize] = useState(13); // Current terminal font size for zoom control.
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -214,6 +215,38 @@ function App() {
     }));
   }; // Spawns branch for a tab.
 
+  const handleZoomIn = () => {
+    setFontSize(prev => Math.min(prev + 1, 28));
+  }; // Increases terminal font size.
+
+  const handleZoomOut = () => {
+    setFontSize(prev => Math.max(prev - 1, 8));
+  }; // Decreases terminal font size.
+
+  const handleZoomReset = () => {
+    setFontSize(13);
+  }; // Resets terminal font size to default.
+
+  // Global keyboard shortcuts for zoom control.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === '-') {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          handleZoomReset();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const renderDashboard = () => {
     if (!activeWorkspace) {
       const registerGuide = (
@@ -269,6 +302,10 @@ function App() {
           isGitRepo={isGitRepo}
           onChangeTabBranch={handleChangeTabBranch}
           onCreateTabBranch={handleCreateTabBranch}
+          fontSize={fontSize}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onZoomReset={handleZoomReset}
         />
       </div>
     ); // Main layouts mapping grid and terminals.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mosaic, MosaicWindow, MosaicNode } from 'react-mosaic-component';
 import { TerminalTab } from './TerminalTab';
-import { Plus, Trash2, LayoutGrid, Split, Check, GitBranch, ChevronDown, Search, X } from 'lucide-react';
+import { Plus, Trash2, LayoutGrid, Split, Check, GitBranch, ChevronDown, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { TerminalTab as TabType } from '../App';
 
 interface TerminalGridProps {
@@ -15,6 +15,10 @@ interface TerminalGridProps {
   isGitRepo: boolean; // Flag marking if the workspace is a valid Git repository.
   onChangeTabBranch: (tabId: string, branch: string) => Promise<void>; // Callback to switch the Git branch/worktree of a terminal tab.
   onCreateTabBranch: (tabId: string, branchName: string) => Promise<void>; // Callback to create and check out a new branch on a terminal tab.
+  fontSize: number; // Current terminal font size for zoom level.
+  onZoomIn: () => void; // Increases the terminal font size by 1.
+  onZoomOut: () => void; // Decreases the terminal font size by 1.
+  onZoomReset: () => void; // Resets the terminal font size to the default 13.
 }
 
 // Recursively removes a target tab ID from a mosaic window layout tree.
@@ -260,6 +264,10 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   isGitRepo,
   onChangeTabBranch,
   onCreateTabBranch,
+  fontSize,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }) => {
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
 
@@ -316,6 +324,25 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
             <Split className="w-3.5 h-3.5" />
           </button>,
           <button
+            key="zoom-out"
+            title="Zoom Out"
+            onClick={onZoomOut}
+            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>,
+          <span key="zoom-label" className="text-[10px] text-slate-500 font-semibold tabular-nums w-5 text-center">
+            {fontSize}
+          </span>,
+          <button
+            key="zoom-in"
+            title="Zoom In"
+            onClick={onZoomIn}
+            className="p-1 text-slate-400 hover:text-neon-blue transition-colors"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>,
+          <button
             key="delete"
             title="Close Terminal"
             onClick={() => onCloseTab(id)}
@@ -325,7 +352,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           </button>,
         ].filter(Boolean) as React.ReactNode[]}
       >
-        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} />
+        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} fontSize={fontSize} />
       </MosaicWindow>
     ); // The rendered tile with toolbars.
     return tileView;
