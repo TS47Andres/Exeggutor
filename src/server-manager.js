@@ -57,22 +57,19 @@ function startServers(root, config, logDir) {
   }; // Combined environment options passed to the spawned process.
 
   const backendLog = resolve(logDir, 'backend.log'); // Logging path mapping for server output.
-  if (!existsSync(backendLog)) writeFileSync(backendLog, '', 'utf8');
+  const fs = require('fs'); // Native file system module reference.
+  const logFd = fs.openSync(backendLog, 'a'); // Open log file in append mode.
 
   let child; // Reference container of the child background process.
-  const fs = require('fs'); // Native file system module reference.
-  const stream = fs.createWriteStream(backendLog, { flags: 'a' }); // Log file write stream.
-
   child = spawn(process.execPath, [entry, ...backendArgs], {
     cwd: backendPath,
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', logFd, logFd],
     detached: true,
     windowsHide: true,
   }); // Spawn the process in a cross-platform detached state.
 
-  if (child.stdout) child.stdout.pipe(stream);
-  if (child.stderr) child.stderr.pipe(stream);
+  fs.closeSync(logFd); // Close parent reference to log file descriptor.
   child.unref();
 
   const cfgPath = resolve(os.homedir(), '.exeggutor.json'); // Absolute path to the runtime configuration file.

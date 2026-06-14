@@ -51,6 +51,7 @@ function App() {
   const [layout, setLayout] = useState<MosaicNode<string> | null>(null); // Current mosaic panel configuration tree.
   const [branches, setBranches] = useState<string[]>([]); // Dynamic list of scanned branches in the active workspace repository.
   const [isGitRepo, setIsGitRepo] = useState(false); // Flag indicating if the active workspace is a Git repository.
+  const [unauthorized, setUnauthorized] = useState(false); // Flag indicating if the session is unauthorized.
 
   useEffect(() => {
     if (!activeWorkspaceId) {
@@ -77,19 +78,52 @@ function App() {
 
   useEffect(() => {
     apiFetch(`${API_BASE}/api/workspaces`)
-      .then(res => res.json())
+      .then(res => {
+        if (res.status === 401) {
+          setUnauthorized(true);
+          throw new Error('Unauthorized');
+        }
+        if (!res.ok) {
+          throw new Error('Server error');
+        }
+        return res.json();
+      })
       .then((data: Workspace[]) => {
-        setWorkspaces(data);
-        if (data.length > 0) {
-          const firstWs = data[0]; // Resolves first workspace.
-          setActiveWorkspaceId(firstWs.id);
-          setLayout(firstWs.layout || null);
+        if (Array.isArray(data)) {
+          setWorkspaces(data);
+          if (data.length > 0) {
+            const firstWs = data[0]; // Resolves first workspace.
+            setActiveWorkspaceId(firstWs.id);
+            setLayout(firstWs.layout || null);
+          }
         }
       })
       .catch(() => {
-        // Safe skip on server offline.
+        // Safe skip on server offline or unauthorized.
       });
   }, []);
+
+  if (unauthorized) {
+    return (
+      <div className="h-screen w-screen bg-dark-900 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
+        <div className="max-w-md w-full p-8 bg-dark-800 border border-red-500/20 rounded-2xl shadow-2xl flex flex-col items-center">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 text-red-500 mb-6 animate-pulse">
+            <Info className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-100 mb-3 tracking-wide">Authentication Required</h2>
+          <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+            Your session is unauthorized. To access the Exeggutor dashboard, please open it from your terminal using:
+          </p>
+          <div className="w-full bg-dark-900 border border-dark-700/60 rounded-xl p-3.5 mb-6 text-left font-mono text-xs text-neon-blue select-all cursor-pointer">
+            exeggutor --open
+          </div>
+          <p className="text-xs text-slate-500 leading-normal">
+            Alternatively, check your <code className="text-slate-400 font-mono">~/.exeggutor.json</code> configuration file and append the token parameter directly to the URL.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId); // Found active workspace data.
 

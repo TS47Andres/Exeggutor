@@ -27,7 +27,8 @@ export const ObserverSidebar: React.FC<ObserverSidebarProps> = ({
   useEffect(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Selected communication protocol.
     const wsHost = window.location.host; // Host:port (Vite proxy handles routing to backend).
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/observer`; // Computed observer ws address (proxied to backend).
+    const token = localStorage.getItem('exeggutor_token') || ''; // Active authorization token value.
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/observer?token=${token}`; // Computed observer ws address with auth query parameter.
     const ws = new WebSocket(wsUrl); // Loaded socket handler.
     wsRef.current = ws;
 
