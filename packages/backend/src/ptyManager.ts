@@ -1,7 +1,5 @@
 import * as pty from 'node-pty';
 import * as os from 'os';
-import * as path from 'path';
-import * as fs from 'fs';
 import { exec } from 'child_process';
 
 export interface TerminalSession {
@@ -148,29 +146,13 @@ export function getOrCreatePtySession(
   const defaultShell = os.platform() === 'win32' ? 'powershell.exe' : 'bash'; // Choose shell path depending on underlying server OS.
   const targetShell = shellPath || defaultShell; // Evaluated shell executable to run.
 
-  const ptyArgs: string[] = []; // Arguments passed to the spawned shell.
-  const ptyEnv = { ...process.env } as Record<string, string>; // Environment variables for the spawned process.
-
-  const isWin = os.platform() === 'win32'; // Flag indicating Windows platform.
-  if (isWin) {
-    const guardScript = path.resolve(__dirname, '../scripts/git-guard.ps1');
-    if (fs.existsSync(guardScript)) {
-      ptyArgs.push('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', `. '${guardScript}'`);
-    }
-  } else {
-    const wrapperDir = path.resolve(__dirname, '../git-wrapper');
-    if (fs.existsSync(path.join(wrapperDir, 'git'))) {
-      ptyEnv.PATH = `${wrapperDir}${path.delimiter}${ptyEnv.PATH || ''}`;
-    }
-  }
-
-  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
+  const ptyProcess = pty.spawn(targetShell, [], {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,
     cwd: cwd,
-    env: ptyEnv,
-    useConpty: false, // Uses winpty on Windows to avoid AttachConsole errors in headless environments.
+    env: process.env as Record<string, string>,
+    useConpty: true, // Uses modern ConPTY for proper cursor escape sequence passthrough.
   }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {
