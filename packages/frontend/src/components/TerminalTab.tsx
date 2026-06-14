@@ -50,7 +50,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
     term.open(containerRef.current);
     if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
-      fitAddon.fit();
+      try { fitAddon.fit(); } catch (_) { /* Safe initial fit skip. */ }
       term.focus();
     } else {
       setTimeout(() => {
@@ -112,7 +112,11 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       if (ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
-      term.dispose();
+      try {
+        term.dispose();
+      } catch (_) {
+        // Safe dispose skip.
+      }
       termRef.current = null;
       fitAddonRef.current = null;
     };
