@@ -68,7 +68,12 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   const selectWorkspaceFolder = useCallback(async () => {
     setBrowseError('');
     try {
-      const res = await fetch(`${API_BASE}/api/browse`);
+      const token = localStorage.getItem('exeggutor_token') || ''; // Active authorization token.
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_BASE}/api/browse`, { headers });
       const data = await res.json() as { path: string; error?: string };
       if (data?.path) {
         setFolderPath(data.path);
