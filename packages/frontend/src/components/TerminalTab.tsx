@@ -6,10 +6,11 @@ interface TerminalTabProps {
   workspaceId: string; // The ID of the parent workspace owning the tab.
   tabId: string; // The unique ID of this terminal session tab.
   isActive: boolean; // Flag to indicate if this terminal window is currently focused.
+  connectionDelay?: number; // Optional delay in ms before connecting the WebSocket to stagger PTY creation.
 }
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
-export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
+export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive, connectionDelay }) => {
   const [ready, setReady] = useState(false); // Tracks if the container has non-zero dimensions.
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
@@ -37,7 +38,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     return () => { ro.disconnect(); setReady(false); };
   }, []);
 
-  // Phase 2: Create the terminal and WebSocket only when the container has final dimensions.
+  // Phase 2: Create the xterm.js terminal instance when the container has dimensions.
   useEffect(() => {
     if (!ready || !containerRef.current) return;
 
@@ -74,8 +75,15 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     const wsHost = window.location.host; // Host:port of the current page (Vite proxy handles routing to backend).
     const token = localStorage.getItem('exeggutor_token') || ''; // Active authorization token value.
     const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}?token=${token}`; // Dynamic target websocket connection URL with auth query parameter.
-    const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
-    wsRef.current = ws;
+
+    // Terminal input forwarding (works before WS connects — checks readyState on send).
+    term.onData((data) => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN && !disposedRef.current) {
+        const payload = JSON.stringify({ type: 'input', data }); // Serialized terminal input payload.
+        ws.send(payload);
+      }
+    });
 
     // Synchronizes the current frontend xterm dimensions with the backend PTY session.
     const sendResize = () => {
@@ -86,7 +94,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
           const finalCols = Math.max(term.cols, 40); // Ensures the terminal is not resized below a minimum of 40 columns.
           const finalRows = Math.max(term.rows, 10); // Ensures the terminal is not resized below a minimum of 10 rows.
           if (finalCols > 0 && finalRows > 0) {
-            if (ws.readyState === WebSocket.OPEN) {
+            const ws = wsRef.current;
+            if (ws && ws.readyState === WebSocket.OPEN) {
               if (finalCols !== lastColsRef.current || finalRows !== lastRowsRef.current) {
                 lastColsRef.current = finalCols;
                 lastRowsRef.current = finalRows;
@@ -101,43 +110,56 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       }
     };
 
+    const resizeObserver = new ResizeObserver(sendResize); // Observation controller notifying on layout changes.
+    resizeObserver.observe(containerRef.current);
+
     // Container has dimensions at this point, so fit succeeds immediately without flicker.
     term.open(containerRef.current);
     fitAddon.fit();
     term.focus();
-    sendResize();
 
-    ws.onmessage = (event) => {
-      if (!disposedRef.current) {
-        try {
-          term.write(event.data);
-        } catch (_) {
-          // Safe write skip after disposal.
+    // Connect the WebSocket (possibly delayed for staggered page-load initialization).
+    const wsTimer = setTimeout(() => {
+      if (disposedRef.current) return;
+
+      const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        if (!disposedRef.current) {
+          try {
+            term.write(event.data);
+          } catch (_) {
+            // Safe write skip after disposal.
+          }
         }
-      }
-    };
+      };
 
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN && !disposedRef.current) {
-        const payload = JSON.stringify({ type: 'input', data }); // Serialized terminal input payload.
-        ws.send(payload);
-      }
-    });
+      ws.onopen = () => {
+        sendResize();
+      };
 
-    const resizeObserver = new ResizeObserver(sendResize); // Observation controller notifying on layout changes.
-    resizeObserver.observe(containerRef.current);
-
-    ws.onopen = sendResize;
+      ws.onclose = () => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+      };
+    }, connectionDelay || 0);
 
     const cleanup = () => {
       disposedRef.current = true;
+      clearTimeout(wsTimer);
       resizeObserver.disconnect();
-      ws.onopen = null;
-      ws.onclose = null;
-      ws.onerror = null;
-      ws.onmessage = null;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
+      const ws = wsRef.current;
+      if (ws) {
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.onmessage = null;
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+        wsRef.current = null;
       }
       try {
         term.dispose();
@@ -148,7 +170,20 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       fitAddonRef.current = null;
     };
     return cleanup;
-  }, [ready, tabId, workspaceId]);
+  }, [ready, tabId, workspaceId, connectionDelay]);
+
+  // Phase 3: Close the WebSocket synchronously on page unload to prevent race conditions between
+  // the old session cleanup and the new page's WebSocket connection during refresh.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Re-fits the terminal when the tab becomes active.
   useEffect(() => {
