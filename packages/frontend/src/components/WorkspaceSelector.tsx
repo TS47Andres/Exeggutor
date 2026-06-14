@@ -160,7 +160,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                   onDeleteWorkspace(activeWorkspace.id);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-neon-red hover:bg-neon-red/10 rounded transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete Active Workspace
