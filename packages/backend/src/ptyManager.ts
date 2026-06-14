@@ -2,24 +2,13 @@ import * as pty from 'node-pty';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec, spawn } from 'child_process';
+import { exec } from 'child_process';
 import * as db from './workspaceDb'; // Reference to local sessions JSON database.
-
-// Abstract process handle interface wrapping both node-pty IPty instances and PtyHost-backed
-// Windows processes, enabling platform-agnostic terminal I/O operations.
-export interface ProcessHandle {
-  pid: number;
-  write(data: string): void;
-  resize(cols: number, rows: number): void;
-  kill(): void;
-  onData(callback: (data: string) => void): void;
-  onExit(callback: (result: { exitCode: number }) => void): void;
-}
 
 export interface TerminalSession {
   id: string; // The unique tab ID associated with this terminal process.
   workspaceId: string; // The ID of the workspace that owns this session.
-  ptyProcess: ProcessHandle; // The live process instance (node-pty on Unix, PtyHost on Windows).
+  ptyProcess: pty.IPty; // The live node-pty process instance.
   outputBuffer: string[]; // Accumulated recent terminal output lines.
   lastOutputTime: number; // Unix timestamp of the last stdout chunk received.
   status: 'Active' | 'Waiting' | 'Idle' | 'Errored'; // Real-time state of the terminal process.
@@ -143,85 +132,6 @@ export function startStatusAuditor(broadcastCallback: () => void): void {
   }, 1000); // Trigger auditor check every 1 second.
 }
 
-// Spawns a shell via the native PtyHost.exe helper on Windows, using the Windows ConPTY API
-// directly to suppress the OS console window flash. Falls back to node-pty if the helper binary
-// is unavailable. Communicates via a binary type-prefix protocol on stdin/stdout pipes.
-function spawnPtyHostProcess(
-  shell: string,
-  args: string[],
-  cwd: string,
-  env: Record<string, string>
-): ProcessHandle {
-  const hostExe = path.resolve(__dirname, '../bin/PtyHost.exe'); // Path to compiled C# helper.
-  const hostArgs = ['--shell', shell, '--cwd', cwd, '--', ...args]; // Arguments for PtyHost.
-
-  const child = spawn(hostExe, hostArgs, {
-    cwd,
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true,
-  }); // Spawn the hidden native helper process.
-
-  let onDataCb: ((data: string) => void) | null = null; // Registered PTY output callback.
-  let onExitCb: ((result: { exitCode: number }) => void) | null = null; // Registered exit callback.
-  let dataBuffer = Buffer.alloc(0); // Accumulated bytes for protocol message framing.
-
-  // Processes binary protocol messages from PtyHost's stdout: 0x00 + length(4B) + data (output),
-  // or 0x01 + exitCode(4B) (exit).
-  child.stdout.on('data', (chunk: Buffer) => {
-    dataBuffer = Buffer.concat([dataBuffer, chunk]);
-    while (dataBuffer.length > 0) {
-      const msgType = dataBuffer[0]; // Type byte.
-      if (msgType === 0x00) {
-        if (dataBuffer.length < 5) break;
-        const payloadLen = dataBuffer.readUInt32LE(1); // Length of the data payload.
-        const totalLen = 1 + 4 + payloadLen; // Complete message byte count.
-        if (dataBuffer.length < totalLen) break;
-        const payload = dataBuffer.slice(5, 5 + payloadLen).toString('utf-8'); // Extracted output string.
-        dataBuffer = dataBuffer.slice(totalLen);
-        if (onDataCb) onDataCb(payload);
-      } else if (msgType === 0x01) {
-        if (dataBuffer.length < 5) break;
-        const exitCode = dataBuffer.readInt32LE(1); // Process exit code.
-        dataBuffer = dataBuffer.slice(5);
-        if (onExitCb) onExitCb({ exitCode });
-      } else {
-        dataBuffer = dataBuffer.slice(1);
-      }
-    }
-  });
-
-  child.on('error', () => {
-    if (onExitCb) onExitCb({ exitCode: 1 });
-  });
-
-  child.on('exit', (code) => {
-    if (onExitCb) onExitCb({ exitCode: code ?? 0 });
-  });
-
-  return {
-    pid: child.pid || 0, // PID of the PtyHost process itself.
-    write(data: string) {
-      const input = Buffer.from(data, 'utf-8'); // Encoded input bytes.
-      const header = Buffer.alloc(5);
-      header[0] = 0x01; // Input data type marker.
-      header.writeUInt32LE(input.length, 1); // Length prefix.
-      child.stdin.write(header);
-      child.stdin.write(input);
-    },
-    resize(cols: number, rows: number) {
-      const msg = Buffer.alloc(9);
-      msg[0] = 0x00; // Resize type marker.
-      msg.writeUInt32LE(Math.max(cols, 40), 1); // Columns (min 40).
-      msg.writeUInt32LE(Math.max(rows, 10), 5); // Rows (min 10).
-      child.stdin.write(msg);
-    },
-    kill() { child.kill(); },
-    onData(cb: (data: string) => void) { onDataCb = cb; },
-    onExit(cb: (result: { exitCode: number }) => void) { onExitCb = cb; },
-  };
-}
-
 // Spawns a persistent terminal process or retrieves an existing one, matching it to the tab.
 export function getOrCreatePtySession(
   workspaceId: string,
@@ -255,31 +165,14 @@ export function getOrCreatePtySession(
     }
   }
 
-  let ptyProcess: ProcessHandle; // The spawned process handle, either from PtyHost or node-pty.
-
-  if (isWin) {
-    const hostExe = path.resolve(__dirname, '../bin/PtyHost.exe'); // Path to the compiled C# helper.
-    if (fs.existsSync(hostExe)) {
-      ptyProcess = spawnPtyHostProcess(targetShell, ptyArgs, cwd, ptyEnv); // Spawn via hidden ConPTY helper.
-    } else {
-      ptyProcess = pty.spawn(targetShell, ptyArgs, {
-        name: 'xterm-256color',
-        cols: 80,
-        rows: 24,
-        cwd: cwd,
-        env: ptyEnv,
-        useConpty: true, // Fall back to node-pty ConPTY if native helper is unavailable.
-      }) as unknown as ProcessHandle; // Cast to abstract handle (interface shape matches).
-    }
-  } else {
-    ptyProcess = pty.spawn(targetShell, ptyArgs, {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: cwd,
-      env: ptyEnv,
-    }) as unknown as ProcessHandle; // Spawn via node-pty on non-Windows platforms.
-  }
+  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
+    name: 'xterm-256color',
+    cols: 80,
+    rows: 24,
+    cwd: cwd,
+    env: ptyEnv,
+    useConpty: true, // Enables the Windows Pseudo Console API for accurate dimension resizes.
+  }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {
     id: tabId,

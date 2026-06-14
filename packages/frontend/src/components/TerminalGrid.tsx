@@ -284,11 +284,6 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
       return missingTile;
     }
 
-    // Computes a staggered delay for each terminal's WebSocket connection on page load to
-    // distribute PTY creation across time and reduce visual OS console window flash overlap.
-    const tabIndex = tabs.findIndex(t => t.id === id); // Position of this tab in the workspace list.
-    const connectionDelay = tabIndex > 0 ? tabIndex * 200 : 0; // Stagger delay: 0ms for first, 200ms increments.
-
     const handleSelectBranch = (val: string) => {
       onChangeTabBranch(id, val);
     }; // Event coordinator for tab branch selection.
@@ -357,7 +352,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           </div>,
         ].filter(Boolean) as React.ReactNode[]}
       >
-        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} connectionDelay={connectionDelay} />
+        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} />
       </MosaicWindow>
     ); // The rendered tile with toolbars.
     return tileView;
