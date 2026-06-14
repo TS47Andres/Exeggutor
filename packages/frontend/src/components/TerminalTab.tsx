@@ -107,6 +107,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       resizeObserver.disconnect();
       ws.close();
       term.dispose();
+      termRef.current = null;
+      fitAddonRef.current = null;
     };
     return cleanup;
   }, [tabId, workspaceId]);
