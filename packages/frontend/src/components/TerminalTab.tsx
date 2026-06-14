@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 
@@ -10,7 +10,6 @@ interface TerminalTabProps {
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
 export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
-  const [isRendered, setIsRendered] = useState(false); // Tracks if the terminal has been successfully fitted for the first time.
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
   const wsRef = useRef<WebSocket | null>(null); // Reference containing the websocket connection pointing to the terminal server.
@@ -66,7 +65,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       try {
         if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0) && !disposedRef.current) {
           fitAddon.fit();
-          setIsRendered(true); // Mark as successfully fitted and visible.
           const finalCols = Math.max(term.cols, 40); // Ensures the terminal is not resized below a minimum of 40 columns.
           const finalRows = Math.max(term.rows, 10); // Ensures the terminal is not resized below a minimum of 10 rows.
           if (finalCols > 0 && finalRows > 0) {
@@ -89,19 +87,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     if (containerRef.current && (containerRef.current.offsetWidth > 0 || containerRef.current.offsetHeight > 0)) {
       try {
         fitAddon.fit();
-        setIsRendered(true);
       } catch (_) { /* Safe initial fit skip. */ }
       term.focus();
-    } else {
-      setTimeout(() => {
-        if (containerRef.current && fitAddonRef.current && !disposedRef.current) {
-          try {
-            fitAddonRef.current.fit();
-            setIsRendered(true);
-          } catch (_) {}
-          sendResize();
-        }
-      }, 100);
+      sendResize();
     }
 
     ws.onmessage = (event) => {
@@ -176,7 +164,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     <div className="w-full h-full bg-dark-900 relative">
       <div
         ref={containerRef}
-        className={`absolute inset-0 w-full h-full transition-opacity duration-150 ${isRendered ? 'opacity-100' : 'opacity-0'}`}
+        className="absolute inset-0 w-full h-full bg-dark-900"
         onClick={() => termRef.current?.focus()}
       />
     </div>

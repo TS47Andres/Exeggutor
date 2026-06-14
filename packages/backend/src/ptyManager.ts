@@ -156,7 +156,7 @@ export function getOrCreatePtySession(
   if (isWin) {
     const guardScript = path.resolve(__dirname, '../scripts/git-guard.ps1');
     if (fs.existsSync(guardScript)) {
-      ptyArgs.push('-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', `. '${guardScript}'`);
+      ptyArgs.push('-NoLogo', '-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', `. '${guardScript}'`);
     }
   } else {
     const wrapperDir = path.resolve(__dirname, '../git-wrapper');
@@ -165,7 +165,10 @@ export function getOrCreatePtySession(
     }
   }
 
-  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
+  // On Windows, use conhost.exe --headless to prevent the console window from flashing.
+  const winShell = isWin ? 'conhost.exe' : targetShell;
+  const winArgs = isWin ? ['--headless', targetShell, ...ptyArgs] : ptyArgs;
+  const ptyProcess = pty.spawn(winShell, winArgs, {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,
