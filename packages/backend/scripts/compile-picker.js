@@ -2,21 +2,24 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const SOURCE = path.join(__dirname, '..', 'native', 'FolderPicker.cs');
-const OUTPUT = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
+const SOURCE = path.join(__dirname, '..', 'native', 'FolderPicker.cs'); // Path to the C# source file.
+const OUTPUT = path.join(__dirname, '..', 'bin', 'FolderPicker.exe'); // Output path for the compiled binary.
 
-const windir = process.env.windir || 'C:\\Windows';
-const CSC_PATHS = [
+const windir = process.env.windir || 'C:\\Windows'; // Windows directory, defaulting to C:\Windows.
+const CSC_PATHS = [ // Candidate paths for the C# compiler executable.
   path.join(windir, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe'),
   path.join(windir, 'Microsoft.NET', 'Framework', 'v4.0.30319', 'csc.exe'),
 ];
 
+// Locates the C# compiler executable from the known .NET Framework SDK paths.
 function findCsc() {
   return CSC_PATHS.find(p => fs.existsSync(p));
 }
 
+// Compiles FolderPicker.cs into a winexe binary using the .NET Framework C# compiler.
 function compile() {
-  const csc = findCsc();
+  const csc = findCsc(); // The located csc.exe path, or undefined if not found.
+
   if (!csc) {
     console.error(
       'Warning: C# compiler (csc.exe) not found.\n' +
@@ -27,7 +30,8 @@ function compile() {
     return false;
   }
 
-  const outDir = path.dirname(OUTPUT);
+  const outDir = path.dirname(OUTPUT); // Parent directory for the output binary.
+
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true });
   }
@@ -38,8 +42,6 @@ function compile() {
       '/target:winexe',
       '/platform:anycpu',
       `/out:${OUTPUT}`,
-      '/r:System.Windows.Forms.dll',
-      '/r:System.dll',
       SOURCE,
     ], { stdio: 'inherit' });
 
