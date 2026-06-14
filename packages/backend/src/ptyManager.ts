@@ -172,7 +172,6 @@ export function getOrCreatePtySession(
     cwd: cwd,
     env: ptyEnv,
     useConpty: true, // Enables the Windows Pseudo Console API for accurate dimension resizes.
-    useConptyDll: true, // Uses the bundled conpty.dll/OpenConsole.exe to avoid window flash.
   }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {
