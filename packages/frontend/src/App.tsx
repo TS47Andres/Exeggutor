@@ -7,6 +7,27 @@ import { MosaicNode } from 'react-mosaic-component';
 
 const API_BASE = ''; // Empty string means relative URLs (Vite proxy handles routing to backend).
 
+// Helper retrieving the active authentication token.
+const getAuthToken = (): string => {
+  const urlParams = new URLSearchParams(window.location.search); // Parsed URL query parameters.
+  const token = urlParams.get('token') || localStorage.getItem('exeggutor_token') || ''; // Extracted authentication token.
+  if (token) {
+    localStorage.setItem('exeggutor_token', token);
+  }
+  return token;
+};
+
+// Performs a secure HTTP request, automatically injecting the persistent authentication token.
+const apiFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const token = getAuthToken(); // Active authentication token.
+  const headers = new Headers(init?.headers); // Header mapping dictionary.
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const mergedInit = { ...init, headers }; // Request config object.
+  return fetch(input, mergedInit);
+};
+
 export interface TerminalTab {
   id: string; // Tab ID.
   name: string; // Tab name.
@@ -37,7 +58,7 @@ function App() {
       setIsGitRepo(false);
       return;
     }
-    fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/git/branches`)
+    apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/git/branches`)
       .then(res => {
         if (!res.ok) {
           throw new Error();
@@ -55,7 +76,7 @@ function App() {
   }, [activeWorkspaceId, workspaces]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/workspaces`)
+    apiFetch(`${API_BASE}/api/workspaces`)
       .then(res => res.json())
       .then((data: Workspace[]) => {
         setWorkspaces(data);
@@ -79,7 +100,7 @@ function App() {
   }; // Selects a different workspace.
 
   const handleCreateWorkspace = async (name: string, path: string) => {
-    const res = await fetch(`${API_BASE}/api/workspaces`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, path }),
@@ -96,7 +117,7 @@ function App() {
   }; // Creates a new workspace path.
 
   const handleDeleteWorkspace = async (id: string) => {
-    const res = await fetch(`${API_BASE}/api/workspaces/${id}`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${id}`, {
       method: 'DELETE',
     }); // Deletion service response.
     if (res.ok) {
@@ -117,7 +138,7 @@ function App() {
       return;
     }
     setLayout(newLayout);
-    await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}`, {
+    await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ layout: newLayout }),
@@ -129,7 +150,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -152,7 +173,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
       method: 'DELETE',
     }); // Terminal process termination request.
     if (res.ok) {
@@ -172,7 +193,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
@@ -193,7 +214,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ branch: branchName }),
@@ -217,7 +238,7 @@ function App() {
     if (!activeWorkspaceId) {
       return;
     }
-    const res = await fetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}/branches`, {
+    const res = await apiFetch(`${API_BASE}/api/workspaces/${activeWorkspaceId}/tabs/${tabId}/branches`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: branchName }),

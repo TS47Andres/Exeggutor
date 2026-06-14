@@ -23,7 +23,15 @@ function global:git {
 
     if ($isBranchDelete -and $targetBranch) {
         try {
-            $response = Invoke-RestMethod -Uri "http://localhost:4000/api/branches/in-use?name=$targetBranch" -ErrorAction Stop
+            $configPath = Join-Path $env:USERPROFILE ".exeggutor.json"
+            $port = 17492
+            $token = ""
+            if (Test-Path $configPath) {
+                $config = Get-Content $configPath -Raw | ConvertFrom-Json
+                if ($config.backendPort) { $port = $config.backendPort }
+                if ($config.authToken) { $token = $config.authToken }
+            }
+            $response = Invoke-RestMethod -Uri "http://localhost:$port/api/branches/in-use?name=$targetBranch&token=$token" -ErrorAction Stop
             if ($response.inUse -eq $true) {
                 Write-Error "Branch '$targetBranch' is in use by an active Exeggutor terminal. Switch the tab to another branch or close it first."
                 return

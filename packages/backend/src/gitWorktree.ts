@@ -3,6 +3,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
+// Validates git branch names to prevent command injection and ensure compliance with git rules.
+export function validateBranchName(branch: string): void {
+  const cleanPattern = /^[a-zA-Z0-9-_./@]+$/; // Pattern matching safe git branch characters.
+  if (!branch || !cleanPattern.test(branch)) {
+    throw new Error('Invalid branch name. Only alphanumeric, dashes, underscores, dots, slashes, and @ are permitted.');
+  }
+}
+
 // Helper function that executes a terminal command asynchronously and returns its stdout.
 export function execAsync(command: string, cwd: string): Promise<string> {
   const p = new Promise<string>((resolve, reject) => {
@@ -47,6 +55,7 @@ export async function getBranches(folderPath: string): Promise<string[]> {
 
 // Sets up a git worktree for a specific branch inside a hidden sub-folder.
 export async function setupGitWorktree(repoPath: string, branch: string): Promise<string> {
+  validateBranchName(branch);
   const resolvedRepo = path.resolve(repoPath); // Resolved absolute parent repository path.
   const isGit = await isGitRepository(resolvedRepo); // Check flag verifying if the path is a git repo.
   if (!isGit) {
@@ -70,11 +79,30 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
   }
 
   const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-_]/g, '_'); // Sanitized branch name to avoid unsafe folder characters.
-  const worktreePath = path.join(resolvedRepo, '.git', 'worktrees-app', sanitizedBranch); // Path to host the worktree inside the local git configuration directory.
+  const worktreePath = path.join(resolvedRepo, '.exeggutor-worktrees', sanitizedBranch); // Path to host the worktree outside the hidden git directory.
   const worktreeParent = path.dirname(worktreePath); // Parent directory of the target worktree path.
 
   if (!fs.existsSync(worktreeParent)) {
     fs.mkdirSync(worktreeParent, { recursive: true });
+  }
+
+  // Ensure .exeggutor-worktrees is ignored in git.
+  const gitignorePath = path.join(resolvedRepo, '.gitignore'); // Path to workspace gitignore file.
+  const ignorePattern = '.exeggutor-worktrees/'; // Pattern to ignore.
+  try {
+    if (fs.existsSync(gitignorePath)) {
+      const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8'); // Loaded gitignore content.
+      if (!gitignoreContent.includes(ignorePattern)) {
+        const finalContent = gitignoreContent.endsWith('\n') || gitignoreContent.length === 0
+          ? gitignoreContent + ignorePattern + '\n'
+          : gitignoreContent + '\n' + ignorePattern + '\n'; // Structured appended content.
+        fs.writeFileSync(gitignorePath, finalContent, 'utf8');
+      }
+    } else {
+      fs.writeFileSync(gitignorePath, ignorePattern + '\n', 'utf8');
+    }
+  } catch (_) {
+    // Safe ignore ignore-write errors.
   }
 
   if (fs.existsSync(worktreePath)) {
@@ -102,17 +130,27 @@ export async function removeGitWorktree(repoPath: string, worktreePath: string):
   if (!isGit) {
     return;
   }
-  try {
-    const normalizedWorktreePath = path.resolve(worktreePath); // Normalized path of the target worktree.
-    await execAsync(`git worktree remove --force "${normalizedWorktreePath}"`, resolvedRepo);
-  } catch (err) {
-    // If the directory was already manually deleted, force prune.
+  const normalizedWorktreePath = path.resolve(worktreePath); // Normalized path of the target worktree.
+  let retries = 5; // Maximum retries count for lock back-off.
+  while (retries > 0) {
+    try {
+      await execAsync(`git worktree remove --force "${normalizedWorktreePath}"`, resolvedRepo);
+      break;
+    } catch (err) {
+      retries--;
+      if (retries === 0) {
+        // Final fallback skip.
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
   }
   await execAsync('git worktree prune', resolvedRepo);
 }
 
 // Creates a new Git branch in the specified repository.
 export async function createBranch(repoPath: string, branchName: string): Promise<void> {
+  validateBranchName(branchName);
   const resolvedRepo = path.resolve(repoPath); // Resolved absolute repository path.
   const isGit = await isGitRepository(resolvedRepo); // Verification flag.
   if (!isGit) {

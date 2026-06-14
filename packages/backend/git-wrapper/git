@@ -33,7 +33,20 @@ is_branch_delete() {
 
 BRANCH=$(is_branch_delete "$@")
 if [ $? -eq 0 ] && [ -n "$BRANCH" ]; then
-    RESPONSE=$(curl -sf "http://localhost:4000/api/branches/in-use?name=$BRANCH" 2>/dev/null)
+    CONFIG_PATH="$HOME/.exeggutor.json"
+    PORT=17492
+    TOKEN=""
+    if [ -f "$CONFIG_PATH" ]; then
+        CONF_PORT=$(grep -o '"backendPort"[[:space:]]*:[[:space:]]*[0-9]*' "$CONFIG_PATH" | grep -o '[0-9]*')
+        if [ -n "$CONF_PORT" ]; then
+            PORT=$CONF_PORT
+        fi
+        CONF_TOKEN=$(grep -o '"authToken"[[:space:]]*:[[:space:]]*"[^"]*"' "$CONFIG_PATH" | head -n 1 | cut -d '"' -f 4)
+        if [ -n "$CONF_TOKEN" ]; then
+            TOKEN=$CONF_TOKEN
+        fi
+    fi
+    RESPONSE=$(curl -sf "http://localhost:$PORT/api/branches/in-use?name=$BRANCH&token=$TOKEN" 2>/dev/null)
     if [ $? -ne 0 ]; then
         echo "ERROR: Cannot verify branch status. Exeggutor backend must be running. Branch deletion blocked for safety." >&2
         exit 1

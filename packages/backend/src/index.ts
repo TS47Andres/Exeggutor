@@ -4,12 +4,25 @@ import fastifyWebsocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
 
 const PORT = parseInt(process.env.EXEGGUTOR_BACKEND_PORT || '17492', 10); // Backend API port from env or default.
 const FRONTEND_DIST = process.env.EXEGGUTOR_FRONTEND_DIST || ''; // Path to built frontend dist/ folder.
+const configPath = path.resolve(os.homedir(), '.exeggutor.json'); // Path to CLI config file.
+let authToken = process.env.EXEGGUTOR_AUTH_TOKEN || ''; // Active authorization token.
+try {
+  if (fs.existsSync(configPath)) {
+    const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8')); // Loaded configuration settings.
+    if (cfg.authToken) {
+      authToken = cfg.authToken;
+    }
+  }
+} catch (_) {
+  // Safe ignore config load errors.
+}
 
 const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
 const observerSockets = new Set<any>(); // Registry containing all active WebSocket connections for the observer sidebar.
@@ -31,8 +44,28 @@ function broadcastObserverUpdate(): void {
 
 // Registers HTTP routes, WebSockets endpoints, and starts the Fastify service.
 async function bootstrap(): Promise<void> {
+  // Clean up any orphaned terminal shell processes from previous runs.
+  pty.cleanOrphanedPtyProcesses();
+
   await server.register(fastifyCors, { origin: true });
   await server.register(fastifyWebsocket);
+
+  server.addHook('preHandler', async (request, reply) => {
+    const url = request.url; // Target request URL path.
+    if (url.startsWith('/api') || url.startsWith('/ws')) {
+      let token = (request.query as any)?.token; // Token extracted from query parameter.
+      if (!token) {
+        const authHeader = request.headers.authorization; // Auth header content.
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          token = authHeader.substring(7);
+        }
+      }
+      if (!authToken || token !== authToken) {
+        reply.status(401).send({ error: 'Unauthorized' });
+        return reply;
+      }
+    }
+  }); // Registers authentication pre-handler hook.
 
   // Serve built frontend statically when EXEGGUTOR_FRONTEND_DIST is set (production mode).
   if (FRONTEND_DIST && fs.existsSync(FRONTEND_DIST)) {
@@ -390,7 +423,7 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  await server.listen({ port: PORT, host: '0.0.0.0' });
+  await server.listen({ port: PORT, host: '127.0.0.1' });
   console.log(`Backend daemon is listening on port ${PORT}`);
 }
 

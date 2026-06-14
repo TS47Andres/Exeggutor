@@ -70,10 +70,15 @@ Notes:
 
 // Starts all servers in background, auto-resolving ports.
 async function handleStartServers(root, configPath, extraArgs) {
-  const config = loadConfig(configPath);
+  const config = loadConfig(configPath); // Loaded configuration settings dictionary.
+
+  // Generate secure token if not present
+  if (!config.authToken) {
+    config.authToken = require('crypto').randomBytes(16).toString('hex'); // Secure random hex token.
+  }
 
   // Resolve port
-  const backendPort = config.backendPort || await findAvailablePort(17492);
+  const backendPort = config.backendPort || await findAvailablePort(17492); // Resolved server API port.
 
   // Save port to config for consistency
   config.backendPort = backendPort;
@@ -170,9 +175,10 @@ async function showStatus(configPath) {
 
 // Opens the dashboard in the default browser.
 function openDashboard(configPath) {
-  const config = loadConfig(configPath);
-  const port = config.backendPort || 17492;
-  const url = `http://localhost:${port}`;
+  const config = loadConfig(configPath); // Loaded configuration settings.
+  const port = config.backendPort || 17492; // Active backend port.
+  const token = config.authToken || ''; // Active authorization token.
+  const url = `http://localhost:${port}/?token=${token}`; // Formatted dashboard URL with token query string.
 
   const platform = process.platform;
   try {
@@ -420,10 +426,23 @@ function saveConfig(configPath, config) {
   }
 }
 
+// Helper to resolve the active authentication token.
+function getAuthToken() {
+  try {
+    const configPath = resolve(require('os').homedir(), '.exeggutor.json'); // Path to CLI config file.
+    if (existsSync(configPath)) {
+      const cfg = JSON.parse(readFileSync(configPath, 'utf8')); // Loaded configuration settings.
+      return cfg.authToken || '';
+    }
+  } catch (_) {}
+  return '';
+}
+
 // Pings the backend to check if it is alive.
 function pingBackend(port) {
   return new Promise((resolve) => {
-    const req = http.get(`http://localhost:${port}/api/workspaces`, (res) => {
+    const token = getAuthToken(); // Active authentication token.
+    const req = http.get(`http://localhost:${port}/api/workspaces?token=${token}`, (res) => {
       resolve(res.statusCode < 500);
     });
     req.on('error', () => resolve(false));
@@ -434,8 +453,12 @@ function pingBackend(port) {
 // HTTP GET helper.
 function apiGet(port, path) {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:${port}${path}`, (res) => {
-      let data = '';
+    const token = getAuthToken(); // Active authentication token.
+    const options = {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }; // Request options dictionary.
+    http.get(`http://localhost:${port}${path}`, options, (res) => {
+      let data = ''; // Accumulated response text.
       res.on('data', c => data += c);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -451,12 +474,17 @@ function apiGet(port, path) {
 // HTTP POST helper.
 function apiPost(port, path, body) {
   return new Promise((resolve, reject) => {
-    const json = JSON.stringify(body);
+    const token = getAuthToken(); // Active authentication token.
+    const json = JSON.stringify(body); // Serialized payload body.
     const req = http.request(`http://localhost:${port}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(json) },
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(json),
+        'Authorization': `Bearer ${token}`
+      },
     }, (res) => {
-      let data = '';
+      let data = ''; // Accumulated response text.
       res.on('data', c => data += c);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -475,12 +503,17 @@ function apiPost(port, path, body) {
 // HTTP PUT helper.
 function apiPut(port, path, body) {
   return new Promise((resolve, reject) => {
-    const json = JSON.stringify(body);
+    const token = getAuthToken(); // Active authentication token.
+    const json = JSON.stringify(body); // Serialized payload body.
     const req = http.request(`http://localhost:${port}${path}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(json) },
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(json),
+        'Authorization': `Bearer ${token}`
+      },
     }, (res) => {
-      let data = '';
+      let data = ''; // Accumulated response text.
       res.on('data', c => data += c);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -499,10 +532,14 @@ function apiPut(port, path, body) {
 // HTTP DELETE helper.
 function apiDelete(port, path) {
   return new Promise((resolve, reject) => {
+    const token = getAuthToken(); // Active authentication token.
     const req = http.request(`http://localhost:${port}${path}`, {
       method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
     }, (res) => {
-      let data = '';
+      let data = ''; // Accumulated response text.
       res.on('data', c => data += c);
       res.on('end', () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {

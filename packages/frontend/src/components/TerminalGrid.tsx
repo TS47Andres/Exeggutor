@@ -264,6 +264,8 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   onCreateTabBranch,
 }) => {
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null); // Active tab ID being renamed.
+  const [renameValue, setRenameValue] = useState(''); // Text input value for the tab rename field.
 
   const handleAddTerminal = () => {
     onAddTab(`Terminal ${tabs.length + 1}`);
@@ -296,11 +298,9 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
     ) : null; // Dynamic branch custom dropdown tag.
 
     const handleRename = () => {
-      const newName = window.prompt('Enter new terminal name:', tabData.name);
-      if (newName && newName.trim() && newName.trim() !== tabData.name) {
-        onRenameTab(id, newName.trim());
-      }
-    }; // Prompts user for a new name and triggers rename.
+      setRenameValue(tabData.name);
+      setRenamingTabId(id);
+    }; // Activates the custom rename modal.
 
     const tileView = (
       <MosaicWindow<string>
@@ -376,6 +376,51 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
 
   const activeLayout = layout || tabs[0].id; // Resolves default layout to single tile if tree state is null.
 
+  const renameModal = renamingTabId ? (() => {
+    const tabData = tabMap.get(renamingTabId); // Configuration for the target renaming tab.
+    if (!tabData) return null;
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (renameValue.trim() && renameValue.trim() !== tabData.name) {
+        onRenameTab(renamingTabId, renameValue.trim());
+      }
+      setRenamingTabId(null);
+    }; // Submits tab rename event and hides modal.
+    const modalView = (
+      <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[100]" onClick={() => setRenamingTabId(null)}>
+        <div className="bg-dark-800 border border-dark-700 w-80 rounded-xl p-4 shadow-2xl flex flex-col font-sans gap-4" onClick={e => e.stopPropagation()}>
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Rename Terminal</h3>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <input
+              type="text"
+              required
+              autoFocus
+              value={renameValue}
+              onChange={e => setRenameValue(e.target.value)}
+              className="bg-dark-900 border border-dark-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-slate-500 w-full font-sans"
+            />
+            <div className="flex items-center justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setRenamingTabId(null)}
+                className="px-3 py-1.5 hover:bg-dark-700 rounded text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-1.5 bg-neon-blue hover:bg-neon-blue/80 text-dark-900 font-bold rounded transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    ); // Rename Modal view.
+    return modalView;
+  })() : null; // Dynamic rename modal element.
+
   const mosaicGrid = (
     <div className="flex-1 p-4 relative min-h-0 bg-dark-900">
       <Mosaic<string>
@@ -384,6 +429,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
         onChange={onChangeLayout}
         className="mosaic-blueprint-theme"
       />
+      {renameModal}
     </div>
   ); // Core Grid Component.
   return mosaicGrid;

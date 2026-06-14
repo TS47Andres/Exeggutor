@@ -54,7 +54,8 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'; // Computes socket protocol matching current page protocol.
     const wsHost = window.location.host; // Host:port of the current page (Vite proxy handles routing to backend).
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}`; // Dynamic target websocket connection URL (proxied to backend).
+    const token = localStorage.getItem('exeggutor_token') || ''; // Active authorization token value.
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/terminal/${tabId}?token=${token}`; // Dynamic target websocket connection URL with auth query parameter.
     const ws = new WebSocket(wsUrl); // Instant WebSocket connection object.
     wsRef.current = ws;
 

@@ -8,6 +8,7 @@ export interface TerminalTab {
   shell?: string; // Optional shell path override for the terminal.
   branch?: string; // Target Git branch assigned to this individual terminal tab.
   worktreePath?: string; // Path to the generated git worktree for this tab if isolated.
+  pid?: number; // The process ID of the active shell process.
 }
 
 export interface Workspace {
@@ -40,7 +41,9 @@ export function readDatabase(): SessionDb {
 // Serializes and saves the database state back to the local file system.
 export function writeDatabase(db: SessionDb): void {
   const serialized = JSON.stringify(db, null, 2); // Serialized JSON string of the session database structure.
-  fs.writeFileSync(dbPath, serialized, 'utf8');
+  const tempPath = dbPath + '.tmp'; // Temporary file path to write.
+  fs.writeFileSync(tempPath, serialized, 'utf8');
+  fs.renameSync(tempPath, dbPath);
 }
 
 // Retrieves all workspaces registered in the database.

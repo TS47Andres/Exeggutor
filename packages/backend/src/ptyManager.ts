@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
+import * as db from './workspaceDb'; // Reference to local sessions JSON database.
 
 export interface TerminalSession {
   id: string; // The unique tab ID associated with this terminal process.
@@ -187,6 +188,13 @@ export function getOrCreatePtySession(
 
   sessions.set(tabId, newSession);
 
+  // Save process PID to database for future orphan recovery.
+  try {
+    db.updateTerminalTab(workspaceId, tabId, { pid: ptyProcess.pid });
+  } catch (err) {
+    // Safe ignore database update failure.
+  }
+
   ptyProcess.onData(data => {
     newSession.lastOutputTime = Date.now();
     
@@ -260,6 +268,11 @@ export function killPtySession(tabId: string): void {
     } catch (err) {
       // Ignore exit errors.
     }
+    try {
+      db.updateTerminalTab(session.workspaceId, tabId, { pid: undefined }); // Clear the PID record from the database.
+    } catch (err) {
+      // Safe ignore database write failure.
+    }
     sessions.delete(tabId);
   }
 }
@@ -276,4 +289,29 @@ export function getAllSessions(): Array<{ id: string; workspaceId: string; statu
     });
   });
   return list;
+}
+
+// Scans the database for previously persisted terminal tab process IDs and forcefully terminates any orphaned instances.
+export function cleanOrphanedPtyProcesses(): void {
+  try {
+    const workspaces = db.getWorkspaces(); // Load workspaces from database.
+    for (const ws of workspaces) {
+      for (const tab of ws.tabs) {
+        if (tab.pid) {
+          try {
+            process.kill(tab.pid, 'SIGKILL'); // Force terminate the orphaned shell process.
+          } catch (err) {
+            // Safe ignore if the process does not exist or signal fails.
+          }
+          try {
+            db.updateTerminalTab(ws.id, tab.id, { pid: undefined }); // Clear the PID record from the database.
+          } catch (err) {
+            // Safe ignore database write failure.
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // Safe ignore database read/write errors during bootstrap phase.
+  }
 }
