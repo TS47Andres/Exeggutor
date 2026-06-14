@@ -162,11 +162,14 @@ async function bootstrap(): Promise<void> {
 
   server.delete<{ Params: { id: string } }>('/api/workspaces/:id', async (request, reply) => {
     const id = request.params.id; // Target workspace ID.
+    console.log(`[API] DELETE /api/workspaces/${id} -> deleting workspace`);
     const wsList = db.getWorkspaces(); // Entire registered workspaces array.
     const targetWs = wsList.find(w => w.id === id); // Found workspace object matching the target ID.
     if (targetWs) {
+      console.log(`[API] Deleting workspace "${targetWs.name}" (id=${id}) with ${targetWs.tabs.length} tabs`);
       await Promise.all(
         targetWs.tabs.map(async tab => {
+          console.log(`[API] Cleaning up tab ${tab.id} for workspace delete`);
           pty.killPtySession(tab.id);
           if (tab.worktreePath) {
             try {
@@ -178,6 +181,7 @@ async function bootstrap(): Promise<void> {
         })
       ); // Run PTY shutdowns and worktree cleanups concurrently.
       db.deleteWorkspace(id);
+      console.log(`[API] Workspace ${id} deleted`);
     }
     const successResp = { success: true }; // Server confirmation object.
     return successResp;
@@ -201,6 +205,7 @@ async function bootstrap(): Promise<void> {
     async (request, reply) => {
       const id = request.params.id; // Parent workspace ID.
       const { name, shell } = request.body; // Input body variables.
+      console.log(`[API] POST /api/workspaces/${id}/tabs -> creating tab name="${name}" shell="${shell}"`);
       const targetWs = db.getWorkspaces().find(w => w.id === id); // Find matching workspace database entry.
       if (!targetWs) {
         reply.status(404);
@@ -213,6 +218,9 @@ async function bootstrap(): Promise<void> {
         return errorResp;
       }
       const tab = db.createTerminalTab(id, name, targetWs.path, shell); // New tab object created.
+      if (tab) {
+        console.log(`[API] Tab created: id=${tab.id} name="${name}" cwd=${tab.cwd}`);
+      }
       const returnResult = tab; // Created tab descriptor.
       return returnResult;
     }
@@ -223,6 +231,7 @@ async function bootstrap(): Promise<void> {
     async (request, reply) => {
       const { id, tabId } = request.params; // Workspace and tab parameter keys.
       const { name, branch } = request.body; // Extracted updates.
+      console.log(`[API] PUT /api/workspaces/${id}/tabs/${tabId} -> name="${name}" branch="${branch}"`);
       const targetWs = db.getWorkspaces().find(w => w.id === id); // Target workspace object.
       if (!targetWs) {
         reply.status(404);
@@ -240,6 +249,7 @@ async function bootstrap(): Promise<void> {
       let newCwd = tab.cwd; // Preserve current target current working directory.
 
       if (branch !== undefined && branch !== tab.branch) {
+        console.log(`[API] Branch change detected for tab ${tabId}: "${tab.branch}" -> "${branch}", killing PTY`);
         pty.killPtySession(tabId);
         if (tab.worktreePath) {
           try {
@@ -286,6 +296,7 @@ async function bootstrap(): Promise<void> {
     async (request, reply) => {
       const { id, tabId } = request.params; // Workspace and tab keys.
       const { name: branchName } = request.body; // New branch name.
+      console.log(`[API] POST /api/workspaces/${id}/tabs/${tabId}/branches -> branch="${branchName}"`);
       const targetWs = db.getWorkspaces().find(w => w.id === id); // Found workspace.
       if (!targetWs) {
         reply.status(404);
@@ -328,9 +339,11 @@ async function bootstrap(): Promise<void> {
     '/api/workspaces/:id/tabs/:tabId',
     async (request, reply) => {
       const { id, tabId } = request.params; // Tab and workspace parameters.
+      console.log(`[API] DELETE /api/workspaces/${id}/tabs/${tabId} -> deleting tab`);
       const targetWs = db.getWorkspaces().find(w => w.id === id); // Found workspace.
       if (targetWs) {
         const tab = targetWs.tabs.find(t => t.id === tabId); // Target tab config.
+        console.log(`[API] Killing PTY and cleaning up worktree for tab ${tabId}`);
         pty.killPtySession(tabId);
         if (tab && tab.worktreePath) {
           try {
@@ -340,6 +353,7 @@ async function bootstrap(): Promise<void> {
           }
         }
         db.deleteTerminalTab(id, tabId);
+        console.log(`[API] Tab ${tabId} deleted`);
       }
       const successResp = { success: true }; // Operation complete.
       return successResp;
@@ -421,8 +435,9 @@ async function bootstrap(): Promise<void> {
     handler: (request, reply) => {
       reply.status(400).send('WebSocket connection expected');
     },
-    wsHandler: (connection, req) => {
+    wsHandler: async (connection, req) => {
       const tabId = (req.params as any).tabId; // Extract tabId from parameters.
+      console.log(`[WS] Terminal WebSocket connect: tabId=${tabId}`);
       const workspaces = db.getWorkspaces(); // Load workspaces registry.
       let activeTab: db.TerminalTab | undefined = undefined; // Matches the target active tab.
       let activeWs: db.Workspace | undefined = undefined; // Matches the parent workspace containing the tab.
@@ -435,16 +450,26 @@ async function bootstrap(): Promise<void> {
         }
       }
       if (!activeTab || !activeWs) {
+        console.log(`[WS] Terminal tab ${tabId} not found in any workspace, closing connection`);
         connection.close(4001, 'Terminal tab not found');
         return;
       }
-      const session = pty.getOrCreatePtySession(
-        activeWs.id,
-        activeTab.id,
-        activeTab.cwd,
-        activeTab.shell,
-        broadcastObserverUpdate
-      ); // Spawn or attach persistent session process.
+      console.log(`[WS] Calling getOrCreatePtySession for tab ${tabId} (workspace=${activeWs.name}, cwd=${activeTab.cwd})`);
+      let session: pty.TerminalSession; // Reference to the created or retrieved terminal session.
+      try {
+        session = await pty.getOrCreatePtySession(
+          activeWs.id,
+          activeTab.id,
+          activeTab.cwd,
+          activeTab.shell,
+          broadcastObserverUpdate
+        ); // Await spawn or attach of persistent session process (serialized on Windows).
+      } catch (err: any) {
+        console.log(`[WS] getOrCreatePtySession failed for tab ${tabId}: ${err.message}`);
+        connection.close(4002, 'Terminal session creation failed');
+        return;
+      }
+      console.log(`[WS] getOrCreatePtySession returned for tab ${tabId}, PID=${session.ptyProcess.pid}`);
 
       session.activeSocket = connection; // Register the newly connected socket as the active connection.
 
@@ -480,6 +505,7 @@ async function bootstrap(): Promise<void> {
 
       // Disconnects the WebSocket connection and marks the PTY session active socket as empty.
       connection.on('close', () => {
+        console.log(`[WS] Terminal WebSocket disconnect: tabId=${tabId}`);
         if (session.activeSocket === connection) {
           session.activeSocket = undefined;
           session.onData = () => {};

@@ -42,13 +42,15 @@ function startServers(root, config, logDir) {
   const backendPath = resolve(root, 'packages', 'backend'); // Core absolute path of the backend source files.
   const entry = resolveBackendPath(backendPath); // Backend executable entry file reference.
   if (!entry) {
-    console.error('Backend entry not found. Ensure backend is built.');
+    console.error('[MGR] Backend entry not found. Ensure backend is built.');
     return null;
   }
 
   const backendArgs = entry.endsWith('bin.js')
     ? ['--respawn', '--transpile-only', 'src/index.ts']
     : []; // Arguments list parsed to the spawned node runtime.
+
+  console.log(`[MGR] Starting backend: entry="${entry}" args=[${backendArgs.join(', ')}] port=${backendPort}`);
 
   const env = {
     ...process.env,
@@ -59,6 +61,9 @@ function startServers(root, config, logDir) {
   const backendLog = resolve(logDir, 'backend.log'); // Logging path mapping for server output.
   const fs = require('fs'); // Native file system module reference.
   const logFd = fs.openSync(backendLog, 'a'); // Open log file in append mode.
+
+  // Write a startup marker to the log so we can identify process restarts.
+  fs.writeSync(logFd, `\n=== [MGR] Backend starting at ${new Date().toISOString()} ===\n`);
 
   let child; // Reference container of the child background process.
   child = spawn(process.execPath, [entry, ...backendArgs], {
@@ -71,6 +76,8 @@ function startServers(root, config, logDir) {
 
   fs.closeSync(logFd); // Close parent reference to log file descriptor.
   child.unref();
+
+  console.log(`[MGR] Backend started: PID=${child.pid}`);
 
   const cfgPath = resolve(os.homedir(), '.exeggutor.json'); // Absolute path to the runtime configuration file.
   try {
@@ -89,32 +96,39 @@ function stopServers(config) {
   if (pid) {
     try {
       if (IS_WIN) {
+        console.log(`[MGR] Stopping backend PID=${pid} via taskkill /F`);
         execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
       } else {
+        console.log(`[MGR] Stopping backend PID=${pid} via kill -9`);
         execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
       }
-      console.log(`Stopped Exeggutor (PID ${pid})`);
+      console.log(`[MGR] Stopped Exeggutor (PID ${pid})`);
       return;
-    } catch {}
+    } catch (err) {
+      console.log(`[MGR] taskkill/kill failed for PID ${pid}: ${err.message}`);
+    }
   }
   // Fallback: kill any process on our port
   try {
     if (IS_WIN) {
+      console.log(`[MGR] Fallback: killing process on port ${config.backendPort || 17492} via netstat + taskkill`);
       const result = execSync(`netstat -ano | findstr ":${config.backendPort || 17492}"`, { encoding: 'utf8', timeout: 5000 });
       const lines = result.trim().split('\n').filter(l => l.includes('LISTENING'));
       for (const line of lines) {
         const parts = line.trim().split(/\s+/);
         const foundPid = parseInt(parts[parts.length - 1], 10);
         if (!isNaN(foundPid)) {
+          console.log(`[MGR] Fallback: taskkill /F /PID ${foundPid}`);
           execSync(`taskkill /F /PID ${foundPid}`, { stdio: 'ignore' });
-          console.log(`Stopped Exeggutor (PID ${foundPid})`);
+          console.log(`[MGR] Stopped Exeggutor (PID ${foundPid})`);
         }
       }
     } else {
+      console.log(`[MGR] Fallback: killing process on port ${config.backendPort || 17492} via lsof + kill`);
       execSync(`lsof -ti:${config.backendPort || 17492} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
     }
   } catch {
-    console.log('(No running Exeggutor server found)');
+    console.log('[MGR] (No running Exeggutor server found)');
   }
 }
 

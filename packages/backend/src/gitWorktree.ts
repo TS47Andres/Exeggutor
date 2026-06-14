@@ -13,8 +13,9 @@ export function validateBranchName(branch: string): void {
 
 // Helper function that executes a terminal command asynchronously and returns its stdout.
 export function execAsync(command: string, cwd: string): Promise<string> {
+  console.log(`[GIT] execAsync(command="${command}", cwd="${cwd}")`);
   const p = new Promise<string>((resolve, reject) => {
-    const child = exec(command, { cwd }, (error, stdout, stderr) => {
+    const child = exec(command, { cwd, windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
         const errMsg = stderr || error.message; // Resolves the exact error details from stderr or standard node error.
         reject(new Error(errMsg));
@@ -55,6 +56,7 @@ export async function getBranches(folderPath: string): Promise<string[]> {
 
 // Sets up a git worktree for a specific branch inside a hidden sub-folder.
 export async function setupGitWorktree(repoPath: string, branch: string): Promise<string> {
+  console.log(`[GIT] setupGitWorktree(repoPath="${repoPath}", branch="${branch}")`);
   validateBranchName(branch);
   const resolvedRepo = path.resolve(repoPath); // Resolved absolute parent repository path.
   const isGit = await isGitRepository(resolvedRepo); // Check flag verifying if the path is a git repo.
@@ -62,6 +64,7 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
     throw new Error('Target folder is not a valid Git repository');
   }
 
+  console.log(`[GIT] setupGitWorktree: checking existing worktrees for branch="${branch}"`);
   // Check if the branch is already checked out in any worktree (including the main repository).
   const worktreeListOutput = await execAsync('git worktree list --porcelain', resolvedRepo); // Porcelain worktree list output.
   const worktreeLines = worktreeListOutput.split('\n'); // Split by lines.
@@ -106,6 +109,7 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
   }
 
   if (fs.existsSync(worktreePath)) {
+    console.log(`[GIT] setupGitWorktree: worktree path already exists at "${worktreePath}"`);
     const pathExistsResult = worktreePath; // Returns the existing path directly if the worktree directory is already present.
     return pathExistsResult;
   }
@@ -114,10 +118,13 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
   const branchExists = branches.includes(branch); // Flag indicating if the requested branch exists locally.
 
   if (branchExists) {
+    console.log(`[GIT] setupGitWorktree: adding existing branch "${branch}" to worktree`);
     await execAsync(`git worktree add "${worktreePath}" "${branch}"`, resolvedRepo);
   } else {
+    console.log(`[GIT] setupGitWorktree: creating new branch "${branch}" with worktree`);
     await execAsync(`git worktree add -b "${branch}" "${worktreePath}"`, resolvedRepo);
   }
+  console.log(`[GIT] setupGitWorktree: done, path="${worktreePath}"`);
 
   const finalPath = worktreePath; // Path of the newly created worktree.
   return finalPath;
@@ -125,18 +132,23 @@ export async function setupGitWorktree(repoPath: string, branch: string): Promis
 
 // Removes a git worktree and prunes the worktree directory reference.
 export async function removeGitWorktree(repoPath: string, worktreePath: string): Promise<void> {
+  console.log(`[GIT] removeGitWorktree(repoPath="${repoPath}", worktreePath="${worktreePath}")`);
   const resolvedRepo = path.resolve(repoPath); // Resolved absolute repository path.
   const isGit = await isGitRepository(resolvedRepo); // Verification flag.
   if (!isGit) {
+    console.log(`[GIT] removeGitWorktree: "${resolvedRepo}" is not a git repo, skipping`);
     return;
   }
   const normalizedWorktreePath = path.resolve(worktreePath); // Normalized path of the target worktree.
   let retries = 5; // Maximum retries count for lock back-off.
   while (retries > 0) {
     try {
+      console.log(`[GIT] removeGitWorktree: running "git worktree remove --force" (attempt ${6 - retries})`);
       await execAsync(`git worktree remove --force "${normalizedWorktreePath}"`, resolvedRepo);
+      console.log(`[GIT] removeGitWorktree: remove OK`);
       break;
     } catch (err) {
+      console.log(`[GIT] removeGitWorktree: remove attempt ${6 - retries} failed: ${err}`);
       retries--;
       if (retries === 0) {
         // Final fallback skip.
@@ -145,11 +157,14 @@ export async function removeGitWorktree(repoPath: string, worktreePath: string):
       }
     }
   }
+  console.log(`[GIT] removeGitWorktree: pruning worktrees`);
   await execAsync('git worktree prune', resolvedRepo);
+  console.log(`[GIT] removeGitWorktree: done`);
 }
 
 // Creates a new Git branch in the specified repository.
 export async function createBranch(repoPath: string, branchName: string): Promise<void> {
+  console.log(`[GIT] createBranch(repoPath="${repoPath}", branchName="${branchName}")`);
   validateBranchName(branchName);
   const resolvedRepo = path.resolve(repoPath); // Resolved absolute repository path.
   const isGit = await isGitRepository(resolvedRepo); // Verification flag.
@@ -157,6 +172,7 @@ export async function createBranch(repoPath: string, branchName: string): Promis
     throw new Error('Target folder is not a valid Git repository');
   }
   await execAsync(`git branch "${branchName}"`, resolvedRepo);
+  console.log(`[GIT] createBranch: branch "${branchName}" created`);
 }
 
 // Mutex flag preventing more than one concurrent folder picker dialog.

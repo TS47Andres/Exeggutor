@@ -20,12 +20,15 @@ export interface TerminalSession {
 
 const sessions = new Map<string, TerminalSession>(); // Global map cache linking tab IDs to their active persistent TerminalSessions.
 let statusCheckInterval: NodeJS.Timeout | null = null; // Background interval reference for running periodic status audits.
+let spawnLock: Promise<void> | null = null; // Mutex promise ensuring only one PTY spawn executes at a time on Windows.
 
 // Queries the operating system to recursively find all active child and descendant process IDs of the specified parent process.
 function getDescendants(parentPid: number): Promise<Array<{ pid: number; name: string }>> {
+  console.log(`[PTY] getDescendants(parentPid=${parentPid})`);
   const p = new Promise<Array<{ pid: number; name: string }>>((resolve) => {
     const isWin = process.platform === 'win32'; // Flag denoting if the host operating system is Windows.
     const cmd = isWin ? 'wmic process get ParentProcessId,ProcessId,Name' : 'ps -A -o ppid,pid,comm'; // System command to run.
+    console.log(`[PTY] getDescendants -> running: "${cmd}"`);
     const runOptions = { windowsHide: true }; // Hide window option.
     exec(cmd, runOptions, (err, stdout) => {
       if (err || !stdout) {
@@ -70,6 +73,7 @@ function getDescendants(parentPid: number): Promise<Array<{ pid: number; name: s
           queue.push(child.pid);
         }
       }
+      console.log(`[PTY] getDescendants(${parentPid}) -> ${descendants.length} descendants: [${descendants.map(d => `${d.name}(${d.pid})`).join(', ')}]`);
       resolve(descendants);
     });
   }); // Spawns execution promise handle.
@@ -129,22 +133,26 @@ export function startStatusAuditor(broadcastCallback: () => void): void {
     if (changed) {
       broadcastCallback();
     }
-  }, 1000); // Trigger auditor check every 1 second.
+  }, 5000); // Trigger auditor check every 5 seconds to reduce wmic process spawn frequency on Windows.
 }
 
 // Spawns a persistent terminal process or retrieves an existing one, matching it to the tab.
-export function getOrCreatePtySession(
+// Uses an async spawn lock to serialize concurrent node-pty process creation on Windows.
+export async function getOrCreatePtySession(
   workspaceId: string,
   tabId: string,
   cwd: string,
   shellPath?: string,
   broadcastCallback?: () => void
-): TerminalSession {
+): Promise<TerminalSession> {
   const existing = sessions.get(tabId); // Attempt to retrieve an existing session from the cache.
   if (existing) {
+    console.log(`[PTY] getOrCreatePtySession -> returning existing session for tab=${tabId} PID=${existing.ptyProcess.pid}`);
     const foundSession = existing; // Explicit reference to the cached session.
     return foundSession;
   }
+
+  console.log(`[PTY] getOrCreatePtySession(workspaceId=${workspaceId}, tabId=${tabId}, cwd=${cwd}, shellPath=${shellPath})`);
 
   const defaultShell = os.platform() === 'win32' ? 'powershell.exe' : 'bash'; // Choose shell path depending on underlying server OS.
   const targetShell = shellPath || defaultShell; // Evaluated shell executable to run.
@@ -165,14 +173,35 @@ export function getOrCreatePtySession(
     }
   }
 
-  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
-    name: 'xterm-256color',
-    cols: 80,
-    rows: 24,
-    cwd: cwd,
-    env: ptyEnv,
-    useConpty: true, // Enables the Windows Pseudo Console API for accurate dimension resizes.
-  }); // Spawn the process via node-pty.
+  // Wait for any in-flight PTY spawn to finish before creating a new one to avoid ConPTY conflicts on Windows.
+  while (spawnLock) {
+    console.log(`[PTY] Spawn lock held, waiting for tab=${tabId}`);
+    await spawnLock;
+  }
+  let releaseLock: () => void = () => {}; // Callback to release the spawn mutex after creation completes, default no-op to avoid TS usage-before-init.
+  spawnLock = new Promise((resolve) => { releaseLock = resolve; });
+
+  console.log(`[PTY] Spawning shell: targetShell="${targetShell}" args=[${ptyArgs.join(', ')}] useConpty=true`);
+  let ptyProcess: pty.IPty; // Reference to the successfully spawned node-pty process.
+  try {
+    ptyProcess = pty.spawn(targetShell, ptyArgs, {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: cwd,
+      env: ptyEnv,
+      useConpty: true, // Enables the Windows Pseudo Console API for accurate dimension resizes.
+    }); // Spawn the process via node-pty.
+    console.log(`[PTY] Spawned PID=${ptyProcess.pid} for tab=${tabId}`);
+  } catch (err: any) {
+    console.log(`[PTY] Spawn FAILED for tab=${tabId}: ${err.message}. Stack: ${err.stack}`);
+    const spawnErr = new Error(`PTY spawn failed for tab ${tabId}: ${err.message}`); // Error wrapping the spawn failure.
+    spawnLock = null;
+    releaseLock();
+    throw spawnErr;
+  }
+  spawnLock = null;
+  releaseLock();
 
   const newSession: TerminalSession = {
     id: tabId,
@@ -263,10 +292,12 @@ export function writeToPtySession(tabId: string, data: string): void {
 export function killPtySession(tabId: string): void {
   const session = sessions.get(tabId); // Find session by tab ID.
   if (session) {
+    console.log(`[PTY] killPtySession(tabId=${tabId}) -> killing PID=${session.ptyProcess.pid}`);
     try {
       session.ptyProcess.kill();
-    } catch (err) {
-      // Ignore exit errors.
+      console.log(`[PTY] killPtySession(tabId=${tabId}) -> kill OK`);
+    } catch (err: any) {
+      console.log(`[PTY] killPtySession(tabId=${tabId}) -> kill error: ${err.message}`);
     }
     try {
       db.updateTerminalTab(session.workspaceId, tabId, { pid: undefined }); // Clear the PID record from the database.
@@ -274,6 +305,9 @@ export function killPtySession(tabId: string): void {
       // Safe ignore database write failure.
     }
     sessions.delete(tabId);
+    console.log(`[PTY] killPtySession(tabId=${tabId}) -> session removed from map`);
+  } else {
+    console.log(`[PTY] killPtySession(tabId=${tabId}) -> no active session found`);
   }
 }
 
@@ -293,9 +327,11 @@ export function getAllSessions(): Array<{ id: string; workspaceId: string; statu
 
 // Verifies that a given PID belongs to an expected Exeggutor-managed process to avoid killing unrelated recycled PIDs.
 function verifyPidOwnership(pid: number): Promise<boolean> {
+  console.log(`[PTY] verifyPidOwnership(pid=${pid})`);
   return new Promise((resolve) => {
     const isWin = process.platform === 'win32'; // Flag indicating Windows platform.
     if (isWin) {
+      console.log(`[PTY] verifyPidOwnership -> running: tasklist /FI "PID eq ${pid}"`);
       exec(`tasklist /FI "PID eq ${pid}" /FO CSV /NH`, { windowsHide: true }, (err, stdout) => {
         if (err || !stdout) {
           resolve(false);
@@ -308,14 +344,19 @@ function verifyPidOwnership(pid: number): Promise<boolean> {
         }
         const name = nameMatch[1].toLowerCase(); // Process name from tasklist.
         const knownNames = ['node.exe', 'powershell.exe', 'cmd.exe', 'bash.exe', 'wmic.exe', 'conhost.exe'];
-        resolve(knownNames.some(k => name.includes(k)));
+        const result = knownNames.some(k => name.includes(k));
+        console.log(`[PTY] verifyPidOwnership(${pid}) -> process="${name}" known=${result}`);
+        resolve(result);
       }); // Spawn tasklist to verify process identity.
     } else {
       try {
         const comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); // Process command name from proc filesystem.
         const knownNames = ['node', 'bash', 'zsh', 'sh', 'dash', 'powershell'];
-        resolve(knownNames.includes(comm));
+        const result = knownNames.includes(comm);
+        console.log(`[PTY] verifyPidOwnership(${pid}) -> process="${comm}" known=${result}`);
+        resolve(result);
       } catch {
+        console.log(`[PTY] verifyPidOwnership(${pid}) -> error reading /proc/${pid}/comm`);
         resolve(false);
       }
     }
@@ -326,11 +367,15 @@ function verifyPidOwnership(pid: number): Promise<boolean> {
 export async function cleanOrphanedPtyProcesses(): Promise<void> {
   try {
     const workspaces = db.getWorkspaces(); // Load workspaces from database.
+    console.log(`[PTY] cleanOrphanedPtyProcesses() -> scanning ${workspaces.length} workspaces`);
     for (const ws of workspaces) {
+      console.log(`[PTY] cleanOrphanedPtyProcesses -> workspace=${ws.id} (${ws.name}) has ${ws.tabs.length} tabs`);
       for (const tab of ws.tabs) {
         if (tab.pid) {
+          console.log(`[PTY] cleanOrphanedPtyProcesses -> checking tab=${tab.id} PID=${tab.pid}`);
           const ownsPid = await verifyPidOwnership(tab.pid); // Flag confirming the PID belongs to an expected process.
           if (!ownsPid) {
+            console.log(`[PTY] cleanOrphanedPtyProcesses -> tab=${tab.id} PID=${tab.pid} not owned, clearing record`);
             try {
               db.updateTerminalTab(ws.id, tab.id, { pid: undefined }); // Clear stale PID record without killing.
             } catch (err) {
@@ -338,10 +383,12 @@ export async function cleanOrphanedPtyProcesses(): Promise<void> {
             }
             continue;
           }
+          console.log(`[PTY] cleanOrphanedPtyProcesses -> tab=${tab.id} PID=${tab.pid} owned, sending SIGKILL`);
           try {
             process.kill(tab.pid, 'SIGKILL'); // Force terminate the orphaned shell process.
-          } catch (err) {
-            // Safe ignore if the process does not exist or signal fails.
+            console.log(`[PTY] cleanOrphanedPtyProcesses -> tab=${tab.id} PID=${tab.pid} killed`);
+          } catch (err: any) {
+            console.log(`[PTY] cleanOrphanedPtyProcesses -> tab=${tab.id} PID=${tab.pid} kill error: ${err.message}`);
           }
           try {
             db.updateTerminalTab(ws.id, tab.id, { pid: undefined }); // Clear the PID record from the database.
@@ -351,7 +398,7 @@ export async function cleanOrphanedPtyProcesses(): Promise<void> {
         }
       }
     }
-  } catch (err) {
-    // Safe ignore database read/write errors during bootstrap phase.
+  } catch (err: any) {
+    console.log(`[PTY] cleanOrphanedPtyProcesses() -> error: ${err.message}`);
   }
 }
