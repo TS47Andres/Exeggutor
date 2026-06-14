@@ -71,9 +71,6 @@ interface IShellItemArray
 
 class FolderPicker
 {
-    [DllImport("user32.dll")]
-    static extern IntPtr GetForegroundWindow();
-
     const uint FOS_PICKFOLDERS = 0x20;
     const uint SIGDN_FILESYSPATH = 0x80058000;
     const int ERROR_CANCELLED = unchecked((int)0x800704C7);
@@ -93,8 +90,7 @@ class FolderPicker
                 dialog.SetOptions(FOS_PICKFOLDERS);
                 dialog.SetTitle("Select Workspace Folder");
 
-                IntPtr parentHwnd = GetForegroundWindow(); // Handle of the browser window that triggered the dialog.
-                int hr = dialog.Show(parentHwnd); // HRESULT from the dialog; 0 = OK, ERROR_CANCELLED = user cancelled.
+                int hr = dialog.Show(IntPtr.Zero); // HRESULT from the dialog; 0 = OK, ERROR_CANCELLED = user cancelled.
                 if (hr == ERROR_CANCELLED)
                 {
                     return;
