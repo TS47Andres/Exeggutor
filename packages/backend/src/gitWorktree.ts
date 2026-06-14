@@ -159,91 +159,120 @@ export async function createBranch(repoPath: string, branchName: string): Promis
   await execAsync(`git branch "${branchName}"`, resolvedRepo);
 }
 
+// Mutex flag preventing more than one concurrent folder picker dialog.
+let pickerInFlight = false;
+
 // Opens a native folder picker dialog using platform-specific tools.
-// Windows: compiled FolderPicker.exe (C#/.NET) using IFileOpenDialog.
+// Windows: compiled FolderPicker.exe (C#/.NET) using FolderBrowserDialog.
 // macOS: osascript with choose folder AppleScript command.
 // Linux: zenity --file-selection, with kdialog as a fallback.
+// Returns the selected path, or an empty string if the user cancelled.
 export async function showFolderPicker(): Promise<string> {
-  const platform = os.platform();
-
-  if (platform === 'win32') {
-    const binaryPath = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
-    const resolvedPath = path.resolve(binaryPath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(
-        `Native folder picker not available (not found at ${resolvedPath}). ` +
-        'Run the compile script (npm run compile-picker) to build it, ' +
-        'or type the workspace path manually.'
-      );
-    }
-
-    return new Promise<string>((resolve, reject) => {
-      const child = spawn(resolvedPath, [], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: false,
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      child.stdout.on('data', (data: Buffer) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
-      });
-
-      child.on('close', (code: number | null) => {
-        if (code === 0) {
-          resolve(stdout.trim());
-        } else {
-          const errMsg = stderr.trim() || `Folder picker exited with code ${code}`;
-          reject(new Error(errMsg));
-        }
-      });
-
-      child.on('error', (err: Error) => {
-        reject(new Error(`Failed to launch folder picker: ${err.message}`));
-      });
-    });
+  // Guard: reject concurrent requests — only one picker dialog at a time.
+  if (pickerInFlight) {
+    return ''; // A dialog is already open; silently return empty.
   }
+  pickerInFlight = true;
 
-  if (platform === 'darwin') {
-    try {
-      const result = await execAsync(
-        'osascript -e \'POSIX path of (choose folder with prompt "Select workspace folder")\'',
-        __dirname
-      );
-      return result;
-    } catch (err: any) {
-      throw new Error(
-        'Failed to open macOS folder picker: ' + (err.message || 'unknown error') + '. ' +
-        'Type the workspace path manually.'
-      );
-    }
-  }
-
-  // Linux and other Unix platforms.
   try {
-    const result = await execAsync(
-      'zenity --file-selection --directory --title="Select workspace folder"',
-      __dirname
-    );
-    return result;
-  } catch (err1: any) {
+    const platform = os.platform();
+
+    if (platform === 'win32') {
+      const binaryPath = path.join(__dirname, '..', 'bin', 'FolderPicker.exe');
+      const resolvedPath = path.resolve(binaryPath);
+
+      if (!fs.existsSync(resolvedPath)) {
+        throw new Error(
+          `Native folder picker not available (not found at ${resolvedPath}). ` +
+          'Type the workspace path manually.'
+        );
+      }
+
+      return await new Promise<string>((resolve, reject) => {
+        const child = spawn(resolvedPath, [], {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: false, // Show the dialog window.
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data: Buffer) => {
+          stdout += data.toString();
+        });
+
+        child.stderr.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
+
+        child.on('close', (code: number | null) => {
+          if (code === 0) {
+            resolve(stdout.trim()); // Path selected.
+          } else if (code === 2) {
+            resolve(''); // User cancelled — not an error.
+          } else {
+            const errMsg = stderr.trim() || `Folder picker exited with code ${code}`;
+            reject(new Error(errMsg));
+          }
+        });
+
+        child.on('error', (err: Error) => {
+          reject(new Error(`Failed to launch folder picker: ${err.message}`));
+        });
+      });
+    }
+
+    if (platform === 'darwin') {
+      try {
+        const result = await execAsync(
+          'osascript -e \'POSIX path of (choose folder with prompt "Select workspace folder")\'',
+          __dirname
+        );
+        return result;
+      } catch (err: any) {
+        // User cancelled AppleScript (returns non-zero) — treat as empty.
+        const msg: string = err?.message || '';
+        if (msg.includes('User canceled') || msg.includes('cancelled')) {
+          return '';
+        }
+        throw new Error(
+          'Failed to open macOS folder picker: ' + msg + '. ' +
+          'Type the workspace path manually.'
+        );
+      }
+    }
+
+    // Linux and other Unix platforms.
     try {
       const result = await execAsync(
-        'kdialog --getexistingdirectory --title="Select workspace folder"',
+        'zenity --file-selection --directory --title="Select workspace folder"',
         __dirname
       );
       return result;
-    } catch (err2: any) {
-      throw new Error(
-        'Folder picker not available. Install zenity or kdialog, ' +
-        'or type the workspace path manually.'
-      );
+    } catch (err1: any) {
+      const msg1: string = err1?.message || '';
+      if (msg1.includes('cancel') || msg1.includes('dismiss')) {
+        return '';
+      }
+      try {
+        const result = await execAsync(
+          'kdialog --getexistingdirectory --title="Select workspace folder"',
+          __dirname
+        );
+        return result;
+      } catch (err2: any) {
+        const msg2: string = err2?.message || '';
+        if (msg2.includes('cancel') || msg2.includes('dismiss')) {
+          return '';
+        }
+        throw new Error(
+          'Folder picker not available. Install zenity or kdialog, ' +
+          'or type the workspace path manually.'
+        );
+      }
     }
+  } finally {
+    pickerInFlight = false; // Always release the lock.
   }
 }
+

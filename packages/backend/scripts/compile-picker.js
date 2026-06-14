@@ -38,6 +38,8 @@ function compile() {
       '/target:winexe',
       '/platform:anycpu',
       `/out:${OUTPUT}`,
+      '/r:System.Windows.Forms.dll',
+      '/r:System.dll',
       SOURCE,
     ], { stdio: 'inherit' });
 

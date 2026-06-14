@@ -1,43 +1,65 @@
 using System;
-using System.IO;
 using System.Windows.Forms;
+using System.Threading;
+
+// Native folder picker using Windows Forms FolderBrowserDialog.
+// Runs on its own STA thread to ensure proper COM apartment initialization.
+// Exit codes:
+//   0 = Success, selected path printed to stdout.
+//   1 = Error (message printed to stderr).
+//   2 = User cancelled (no output).
 
 class FolderPicker
 {
-    [STAThread]
     static void Main()
     {
-        try
-        {
-            using (OpenFileDialog dialog = new OpenFileDialog())
-            {
-                dialog.Title = "Select Workspace Folder";
-                dialog.ValidateNames = false;
-                dialog.CheckFileExists = false;
-                dialog.CheckPathExists = true;
-                dialog.FileName = "SelectFolder";
-                dialog.Filter = "Folders|*";
+        string selectedPath = null;
+        Exception caughtError = null;
 
-                if (dialog.ShowDialog() == DialogResult.OK)
+        // Run the folder browser on an STA thread.
+        Thread staThread = new Thread(() =>
+        {
+            try
+            {
+                using (FolderBrowserDialog dialog = new FolderBrowserDialog())
                 {
-                    string path = Path.GetDirectoryName(dialog.FileName);
-                    if (!string.IsNullOrEmpty(path))
+                    dialog.Description = "Select Workspace Folder";
+                    dialog.ShowNewFolderButton = true;
+                    dialog.RootFolder = Environment.SpecialFolder.Desktop;
+
+                    DialogResult result = dialog.ShowDialog();
+                    if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                     {
-                        using (StreamWriter writer = new StreamWriter(Console.OpenStandardOutput()))
-                        {
-                            writer.Write(path);
-                        }
+                        selectedPath = dialog.SelectedPath;
                     }
+                    // else: cancelled or empty — selectedPath stays null
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            using (StreamWriter writer = new StreamWriter(Console.OpenStandardError()))
+            catch (Exception ex)
             {
-                writer.Write("ERROR:" + ex.Message);
+                caughtError = ex;
             }
+        });
+
+        staThread.SetApartmentState(ApartmentState.STA);
+        staThread.Start();
+        staThread.Join();
+
+        if (caughtError != null)
+        {
+            Console.Error.Write("ERROR: " + caughtError.Message);
             Environment.Exit(1);
+        }
+
+        if (selectedPath != null)
+        {
+            Console.Write(selectedPath);
+            Environment.Exit(0);
+        }
+        else
+        {
+            // User cancelled.
+            Environment.Exit(2);
         }
     }
 }

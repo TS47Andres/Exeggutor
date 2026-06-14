@@ -324,6 +324,10 @@ async function bootstrap(): Promise<void> {
   server.get('/api/browse', async (request, reply) => {
     try {
       const folder = await git.showFolderPicker();
+      if (!folder) {
+        // User cancelled the dialog — not an error.
+        return { path: '', cancelled: true };
+      }
       return { path: folder };
     } catch (err: any) {
       reply.status(500);
