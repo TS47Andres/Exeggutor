@@ -223,50 +223,76 @@ export async function showFolderPicker(): Promise<string> {
     }
 
     if (platform === 'darwin') {
-      try {
-        const result = await execAsync(
-          'osascript -e \'POSIX path of (choose folder with prompt "Select workspace folder")\'',
-          __dirname
-        );
-        return result;
-      } catch (err: any) {
-        // User cancelled AppleScript (returns non-zero) — treat as empty.
-        const msg: string = err?.message || '';
-        if (msg.includes('User canceled') || msg.includes('cancelled')) {
-          return '';
-        }
-        throw new Error(
-          'Failed to open macOS folder picker: ' + msg + '. ' +
-          'Type the workspace path manually.'
-        );
-      }
+      // osascript exits with code 1 and stderr containing 'User canceled.' on cancel.
+      return await new Promise<string>((resolve, reject) => {
+        const child = spawn('osascript', [
+          '-e',
+          'POSIX path of (choose folder with prompt "Select workspace folder")'
+        ], { stdio: ['ignore', 'pipe', 'pipe'] });
+
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+        child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+        child.on('close', (code: number | null) => {
+          if (code === 0) {
+            resolve(stdout.trim());
+          } else if (stderr.toLowerCase().includes('user canceled') || stderr.toLowerCase().includes('cancelled')) {
+            resolve(''); // User dismissed the dialog.
+          } else {
+            reject(new Error('Failed to open macOS folder picker. Type the workspace path manually.'));
+          }
+        });
+        child.on('error', () => {
+          reject(new Error('osascript not found. Type the workspace path manually.'));
+        });
+      });
     }
 
-    // Linux and other Unix platforms.
+    // Linux: zenity exits 0 on OK, 1 on cancel. kdialog exits 0 on OK, 1 on cancel.
     try {
-      const result = await execAsync(
-        'zenity --file-selection --directory --title="Select workspace folder"',
-        __dirname
-      );
-      return result;
+      return await new Promise<string>((resolve, reject) => {
+        const child = spawn('zenity', [
+          '--file-selection', '--directory',
+          '--title=Select workspace folder'
+        ], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let stdout = '';
+        child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+        child.on('close', (code: number | null) => {
+          if (code === 0) {
+            resolve(stdout.trim());
+          } else {
+            resolve(''); // code 1 = cancel (or dismiss), not an error.
+          }
+        });
+        child.on('error', (_err: Error) => {
+          reject(new Error('zenity_not_found'));
+        });
+      });
     } catch (err1: any) {
-      const msg1: string = err1?.message || '';
-      if (msg1.includes('cancel') || msg1.includes('dismiss')) {
-        return '';
-      }
+      // zenity not installed — try kdialog (KDE).
       try {
-        const result = await execAsync(
-          'kdialog --getexistingdirectory --title="Select workspace folder"',
-          __dirname
-        );
-        return result;
+        return await new Promise<string>((resolve, reject) => {
+          const child = spawn('kdialog', [
+            '--getexistingdirectory',
+            '--title', 'Select workspace folder'
+          ], { stdio: ['ignore', 'pipe', 'pipe'] });
+          let stdout = '';
+          child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+          child.on('close', (code: number | null) => {
+            if (code === 0) {
+              resolve(stdout.trim());
+            } else {
+              resolve(''); // code 1 = cancel.
+            }
+          });
+          child.on('error', (_err: Error) => {
+            reject(new Error('kdialog_not_found'));
+          });
+        });
       } catch (err2: any) {
-        const msg2: string = err2?.message || '';
-        if (msg2.includes('cancel') || msg2.includes('dismiss')) {
-          return '';
-        }
         throw new Error(
-          'Folder picker not available. Install zenity or kdialog, ' +
+          'Folder picker not available. Install zenity (GNOME) or kdialog (KDE), ' +
           'or type the workspace path manually.'
         );
       }
