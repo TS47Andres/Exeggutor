@@ -164,26 +164,14 @@ export function getOrCreatePtySession(
     }
   }
 
-  let ptyProcess: pty.IPty; // The spawned node-pty process instance.
-  try {
-    ptyProcess = pty.spawn(targetShell, ptyArgs, {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: cwd,
-      env: ptyEnv,
-      useConpty: true, // Uses modern ConPTY for proper cursor escape sequence passthrough.
-    }); // Attempt to spawn with modern ConPTY for cursor support.
-  } catch (_e) {
-    ptyProcess = pty.spawn(targetShell, ptyArgs, {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd: cwd,
-      env: ptyEnv,
-      useConpty: false, // Falls back to winpty when ConPTY is unavailable.
-    }); // Fallback to winpty if ConPTY fails (e.g. headless environments).
-  }
+  const ptyProcess = pty.spawn(targetShell, ptyArgs, {
+    name: 'xterm-256color',
+    cols: 80,
+    rows: 24,
+    cwd: cwd,
+    env: ptyEnv,
+    useConpty: false, // Uses winpty on Windows to avoid AttachConsole errors in headless environments.
+  }); // Spawn the process via node-pty.
 
   const newSession: TerminalSession = {
     id: tabId,
