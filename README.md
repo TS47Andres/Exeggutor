@@ -55,6 +55,14 @@ Create and switch branches per-terminal. New branches automatically spin up an i
 
 A clean welcome screen guides you through registering your first workspace and getting started in seconds.
 
+### Mobile View
+
+<p align="center">
+  <img src="assets/MobileView.png" alt="Mobile" width="40%">
+</p>
+
+Responsive layout with a slide-out sidebar drawer and single-terminal tabbed view for on-the-go access.
+
 ---
 
 ## Architecture
