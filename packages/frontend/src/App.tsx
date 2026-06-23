@@ -454,7 +454,7 @@ function App() {
 
   const mainView = (
     <div className="h-screen w-screen bg-dark-900 flex flex-col overflow-hidden text-slate-100">
-      <header className="h-16 border-b border-white/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
+      <header className="h-16 border-b border-white/20 shadow-glow px-3 lg:px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(true)}

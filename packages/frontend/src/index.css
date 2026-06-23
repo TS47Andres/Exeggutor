@@ -58,12 +58,6 @@
   height: 100%;
 }
 
-.mosaic-blueprint-theme .mosaic-window-body .xterm-viewport {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
-}
-
 .mosaic-blueprint-theme .mosaic-split {
   background: #18181b !important;
   width: 4px !important;
@@ -89,6 +83,14 @@
 /* xterm.js theme tweaks */
 .xterm {
   padding: 16px;
+}
+
+.xterm .xterm-viewport {
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .xterm-viewport::-webkit-scrollbar {

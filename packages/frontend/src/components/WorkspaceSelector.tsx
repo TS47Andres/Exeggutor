@@ -107,7 +107,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       <div className="flex items-center gap-2">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center justify-between gap-3 px-4 py-2 bg-dark-800 border border-dark-700/60 rounded-lg text-sm font-medium hover:border-dark-700 hover:bg-dark-800/80 transition-all w-64 text-left"
+          className="flex items-center justify-between gap-3 px-4 py-2 bg-dark-800 border border-dark-700/60 rounded-lg text-sm font-medium hover:border-dark-700 hover:bg-dark-800/80 transition-all lg:w-64 w-auto max-w-[140px] lg:max-w-none text-left"
         >
           <span className="flex items-center gap-2 truncate">
             <Folder className="w-4 h-4 text-white shrink-0" />
@@ -176,7 +176,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       )}
 
       {showAddForm && (
-        <div className="absolute top-full right-0 mt-2 w-96 bg-dark-800 border border-dark-700 rounded-xl shadow-2xl p-4 z-30 space-y-4">
+        <div className="fixed lg:absolute top-1/2 lg:top-full left-1/2 lg:left-auto -translate-x-1/2 lg:-translate-x-0 -translate-y-1/2 lg:-translate-y-0 mt-0 lg:mt-2 w-[90vw] lg:w-96 max-w-md bg-dark-800 border border-dark-700 rounded-xl shadow-2xl p-4 z-30 space-y-4">
           <h4 className="font-semibold text-sm text-slate-200">Register Workspace</h4>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="space-y-1">
@@ -264,7 +264,9 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   const wrapper = (
     <div className="flex items-center gap-4">
       {dropdownView}
-      {detailView}
+      <div className="hidden lg:flex">
+        {detailView}
+      </div>
     </div>
   ); // Final wrapper layout.
   return wrapper;
