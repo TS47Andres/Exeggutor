@@ -1,6 +1,6 @@
 {
   "name": "exeggutor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Terminal Multiplexer & Git Worktree Manager - local-first workspace coordinator",
   "private": false,
   "bin": {
