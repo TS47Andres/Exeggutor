@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
   body {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   }
@@ -82,11 +86,12 @@
 
 /* xterm.js theme tweaks */
 .xterm {
-  padding: 16px;
+  touch-action: pan-y;
 }
 
-.xterm .xterm-viewport {
+.xterm-viewport {
   overflow-y: auto !important;
+  overflow-x: hidden !important;
   scrollbar-width: thin;
   scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
   touch-action: pan-y;

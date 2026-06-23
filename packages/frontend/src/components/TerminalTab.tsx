@@ -175,11 +175,12 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
   }, [isActive]);
 
   const view = (
-    <div className="w-full h-full bg-dark-900 relative">
+    <div className="w-full h-full bg-dark-900 relative overflow-hidden">
       <div
         ref={containerRef}
         className="absolute inset-0 w-full h-full bg-dark-900"
         onMouseDown={() => { termRef.current?.focus(); onFocus?.(); }}
+        onTouchStart={() => { termRef.current?.focus(); onFocus?.(); }}
       />
     </div>
   ); // The main layout representation.

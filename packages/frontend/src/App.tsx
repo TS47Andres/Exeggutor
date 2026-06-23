@@ -466,7 +466,7 @@ function App() {
           <div className="w-9 h-9 bg-gradient-to-tr from-white to-zinc-100 rounded-lg flex items-center justify-center text-white shadow-lg shadow-white/20">
             <Terminal className="w-5 h-5 text-dark-900" />
           </div>
-          <div className="flex flex-col">
+          <div className="hidden lg:flex flex-col">
             <h1 className="text-sm font-extrabold tracking-wider bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
               EXEGGUTOR
             </h1>

@@ -436,7 +436,7 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
       </div>
 
       {/* Mobile: tab bar + single terminal */}
-      <div className="lg:hidden flex-1 flex flex-col min-h-0 bg-dark-900">
+      <div className="lg:hidden flex-1 flex flex-col min-h-0 bg-dark-900 overflow-hidden">
         <div className="flex items-center overflow-x-auto border-b border-dark-700/60 shrink-0 bg-dark-800/50">
           {tabs.map((tab) => (
             <button
