@@ -133,6 +133,17 @@ exeggutor --tailscale
 
 This binds the server to `0.0.0.0` and makes it reachable at `http://<tailscale-ip>:17492` from any device on your tailnet. The frontend header shows a Tailscale IP badge (with copy-to-clipboard) when in this mode.
 
+### Authenticating from a Remote Browser
+
+When accessing from a remote device (e.g., phone browser), you'll see an authentication page. To sign in:
+
+```bash
+# On the host machine, print the auth token
+exeggutor --show-token
+```
+
+Copy the token and paste it into the input field on the authentication page, then click **Submit**. The token is stored in your browser's localStorage so you only need to do this once per browser.
+
 > **Note:** Tailscale must be installed and connected on the host machine. The badge only appears when `--tailscale` mode is active.
 
 ---
@@ -157,6 +168,7 @@ This binds the server to `0.0.0.0` and makes it reachable at `http://<tailscale-
 | Command | Description |
 |---|---|
 | `exeggutor --tailscale` | Start with Tailscale remote access enabled |
+| `exeggutor --show-token` | Print the auth token for remote browser login |
 
 ### Workspace Management
 
