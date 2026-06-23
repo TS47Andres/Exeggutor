@@ -448,7 +448,7 @@ function App() {
           onDeleteWorkspace={handleDeleteWorkspace}
         />
 
-        {tailscaleInfo && tailscaleInfo.connected && tailscaleInfo.tailscale && (
+        {tailscaleInfo && tailscaleInfo.tailscaleMode && tailscaleInfo.connected && tailscaleInfo.tailscale && (
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-900/50 border border-dark-700/40 text-xs cursor-pointer hover:bg-dark-700/40 transition-colors"
             title={`Tailscale IP: ${tailscaleInfo.tailscale.ip}`}

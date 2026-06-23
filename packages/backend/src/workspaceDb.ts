@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 export interface TerminalTab {
@@ -24,7 +25,7 @@ export interface SessionDb {
   activeWorkspaceId?: string; // ID of the currently selected active workspace.
 }
 
-const dbPath = path.join(__dirname, '../sessions.json'); // Absolute system path pointing to the sessions flat-file JSON database.
+const dbPath = path.join(os.homedir(), '.exeggutor-sessions.json'); // Absolute system path pointing to the sessions flat-file JSON database.
 
 // Reads and parses the sessions database from the local file system.
 export function readDatabase(): SessionDb {
