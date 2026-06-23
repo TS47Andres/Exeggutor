@@ -59,6 +59,7 @@ Commands:
 
   Remote Access:
   --tailscale             Enable remote browser access via Tailscale
+  --show-token            Print the auth token for remote login
 
   Service Management:
   --install-service       Install auto-start on system boot
@@ -579,6 +580,17 @@ function apiDelete(port, path) {
   });
 }
 
+// Prints the auth token from the config for remote login.
+function showToken(configPath) {
+  const config = loadConfig(configPath);
+  if (config.authToken) {
+    console.log(config.authToken);
+  } else {
+    console.error('No auth token found in config. Start exeggutor first to generate one.');
+    process.exit(1);
+  }
+}
+
 module.exports = {
   showVersion,
   showHelp,
@@ -597,5 +609,5 @@ module.exports = {
   deleteWorkspace,
   installAutostart,
   removeAutostart,
-
+  showToken,
 };

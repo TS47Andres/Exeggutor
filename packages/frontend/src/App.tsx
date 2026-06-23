@@ -159,19 +159,44 @@ function App() {
     return (
       <div className="h-screen w-screen bg-dark-900 flex flex-col items-center justify-center p-6 text-center select-none font-sans">
         <div className="max-w-md w-full p-8 bg-dark-800 border border-red-500/20 rounded-2xl shadow-2xl flex flex-col items-center">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 text-red-500 mb-6 animate-pulse">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 text-red-500 mb-6">
             <Info className="w-8 h-8" />
           </div>
           <h2 className="text-2xl font-bold text-slate-100 mb-3 tracking-wide">Authentication Required</h2>
           <p className="text-sm text-slate-400 mb-6 leading-relaxed">
-            Your session is unauthorized. To access the Exeggutor dashboard, please open it from your terminal using:
+            Running on the host machine? Open the dashboard from your terminal:
           </p>
           <div className="w-full bg-dark-900 border border-dark-700/60 rounded-xl p-3.5 mb-6 text-left font-mono text-xs text-white select-all cursor-pointer">
             exeggutor --open
           </div>
-          <p className="text-xs text-slate-500 leading-normal">
-            Alternatively, check your <code className="text-slate-400 font-mono">~/.exeggutor.json</code> configuration file and restart the service with <code className="text-slate-400 font-mono">exeggutor --restart</code>.
-          </p>
+          <div className="w-full border-t border-dark-700/40 pt-5 mt-1">
+            <p className="text-sm text-slate-400 mb-3 leading-relaxed">
+              Accessing remotely? Enter your auth token from <code className="text-slate-400 font-mono text-xs">~/.exeggutor.json</code> on the host machine:
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const input = (e.target as HTMLFormElement).querySelector('input')!;
+              const token = input.value.trim();
+              if (token) {
+                localStorage.setItem('exeggutor_token', token);
+                window.location.reload();
+              }
+            }} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste auth token..."
+                className="flex-1 bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-white hover:bg-white/80 text-dark-900 font-bold text-xs rounded-lg transition-colors"
+              >
+                Submit
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );

@@ -205,6 +205,12 @@ if (first === '--remove-service') {
   return;
 }
 
+// --show-token
+if (first === '--show-token') {
+  cli.showToken(CONFIG_PATH);
+  process.exit(0);
+}
+
 // Unknown command
 console.error(`Unknown command: ${first}`);
 console.error('Run "exeggutor --help" for usage information.');
