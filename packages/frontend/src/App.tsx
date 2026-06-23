@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ObserverSidebar } from './components/ObserverSidebar';
 import { TerminalGrid, removeTabFromTree, addTabToTree } from './components/TerminalGrid';
-import { Terminal, Layout, Plus, Info, Wifi } from 'lucide-react';
+import { Terminal, Layout, Plus, Info, Wifi, Menu } from 'lucide-react';
 import { MosaicNode } from 'react-mosaic-component';
 
 const API_BASE = ''; // Empty string means relative URLs (Vite proxy handles routing to backend).
@@ -50,6 +50,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true); // Flag indicating if the workspaces are currently loading.
   const [ready, setReady] = useState(false); // Flag indicating if session code exchange has completed.
   const [tailscaleInfo, setTailscaleInfo] = useState<{ installed: boolean; connected: boolean; tailscaleMode: boolean; ip?: string; dnsName?: string; tailscale?: { ip: string; dnsName: string; tailnetName: string; online: boolean } } | null>(null); // Tailscale connection state from the backend.
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar drawer visibility state.
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search); // Parsed URL query parameters.
@@ -455,6 +456,13 @@ function App() {
     <div className="h-screen w-screen bg-dark-900 flex flex-col overflow-hidden text-slate-100">
       <header className="h-16 border-b border-white/20 shadow-glow px-6 flex items-center justify-between shrink-0 bg-dark-800 select-none z-10">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+            title="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div className="w-9 h-9 bg-gradient-to-tr from-white to-zinc-100 rounded-lg flex items-center justify-center text-white shadow-lg shadow-white/20">
             <Terminal className="w-5 h-5 text-dark-900" />
           </div>
@@ -494,6 +502,8 @@ function App() {
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
           onSelectWorkspace={handleSelectWorkspace}
+          sidebarOpen={sidebarOpen}
+          onCloseSidebar={() => setSidebarOpen(false)}
         />
         {renderDashboard()}
       </div>
