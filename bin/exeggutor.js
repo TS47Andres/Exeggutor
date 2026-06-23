@@ -28,6 +28,17 @@ if (first === '--help' || first === '-h') {
   process.exit(0);
 }
 
+// --tailscale (start with Tailscale mode)
+if (first === '--tailscale') {
+  const extraArgs = args.slice(1);
+  extraArgs.push('--tailscale');
+  cli.startServers(ROOT, CONFIG_PATH, extraArgs).catch(err => {
+    console.error('Fatal error starting servers:', err.message);
+    process.exit(1);
+  });
+  return;
+}
+
 // --start (default if no recognized flag or no args)
 if (first === '--start' || !first || (first && !first.startsWith('--'))) {
   const passive = first === '--start';
@@ -189,6 +200,24 @@ if (first === '--install-service') {
 if (first === '--remove-service') {
   cli.removeAutostart().catch(err => {
     console.error('Failed to remove autostart service:', err.message);
+    process.exit(1);
+  });
+  return;
+}
+
+// --tailscale-status
+if (first === '--tailscale-status') {
+  cli.tailscaleStatus(CONFIG_PATH).catch(err => {
+    console.error('Failed to get tailscale status:', err.message);
+    process.exit(1);
+  });
+  return;
+}
+
+// --tailscale-pair
+if (first === '--tailscale-pair') {
+  cli.tailscalePair(CONFIG_PATH).catch(err => {
+    console.error('Failed to generate pairing code:', err.message);
     process.exit(1);
   });
   return;

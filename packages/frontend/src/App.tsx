@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ObserverSidebar } from './components/ObserverSidebar';
 import { TerminalGrid, removeTabFromTree, addTabToTree } from './components/TerminalGrid';
-import { Terminal, Layout, Plus, Info } from 'lucide-react';
+import { Terminal, Layout, Plus, Info, Wifi } from 'lucide-react';
 import { MosaicNode } from 'react-mosaic-component';
 
 const API_BASE = ''; // Empty string means relative URLs (Vite proxy handles routing to backend).
@@ -49,6 +49,7 @@ function App() {
   const [unauthorized, setUnauthorized] = useState(false); // Flag indicating if the session is unauthorized.
   const [isLoading, setIsLoading] = useState(true); // Flag indicating if the workspaces are currently loading.
   const [ready, setReady] = useState(false); // Flag indicating if session code exchange has completed.
+  const [tailscaleInfo, setTailscaleInfo] = useState<{ installed: boolean; connected: boolean; tailscaleMode: boolean; ip?: string; dnsName?: string; tailscale?: { ip: string; dnsName: string; tailnetName: string; online: boolean } } | null>(null); // Tailscale connection state from the backend.
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search); // Parsed URL query parameters.
@@ -134,6 +135,23 @@ function App() {
       })
       .finally(() => {
         setIsLoading(false);
+      });
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+    apiFetch(`${API_BASE}/api/tailscale/status`)
+      .then(res => {
+        if (!res.ok) { throw new Error('Failed to fetch'); }
+        return res.json();
+      })
+      .then((data) => {
+        setTailscaleInfo(data);
+      })
+      .catch(() => {
+        setTailscaleInfo(null);
       });
   }, [ready]);
 
@@ -429,6 +447,21 @@ function App() {
           onCreateWorkspace={handleCreateWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
         />
+
+        {tailscaleInfo && tailscaleInfo.connected && tailscaleInfo.tailscale && (
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-900/50 border border-dark-700/40 text-xs cursor-pointer hover:bg-dark-700/40 transition-colors"
+            title={`Tailscale IP: ${tailscaleInfo.tailscale.ip}`}
+            onClick={() => {
+              if (tailscaleInfo.tailscale && tailscaleInfo.tailscale.ip) {
+                navigator.clipboard.writeText(`http://${tailscaleInfo.tailscale.ip}:17492`);
+              }
+            }}
+          >
+            <Wifi className="w-3.5 h-3.5 text-green-400" />
+            <span className="text-slate-400 font-medium">{tailscaleInfo.tailscale.ip}</span>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 flex min-h-0">

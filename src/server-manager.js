@@ -37,7 +37,7 @@ function resolveBackendPath(backendPath) {
 }
 
 // Starts the backend server as a detached background process.
-function startServers(root, config, logDir) {
+function startServers(root, config, logDir, tailscaleMode) {
   const backendPort = config.backendPort || 17492; // Target port where the server daemon listens.
   const backendPath = resolve(root, 'packages', 'backend'); // Core absolute path of the backend source files.
   const entry = resolveBackendPath(backendPath); // Backend executable entry file reference.
@@ -57,6 +57,10 @@ function startServers(root, config, logDir) {
     EXEGGUTOR_BACKEND_PORT: String(backendPort),
     EXEGGUTOR_FRONTEND_DIST: resolve(root, 'packages', 'frontend', 'dist'),
   }; // Combined environment options passed to the spawned process.
+
+  if (tailscaleMode) {
+    env.EXEGGUTOR_TAILSCALE = '1'; // Signal the backend to bind to 0.0.0.0 for Tailscale access.
+  }
 
   const backendLog = resolve(logDir, 'backend.log'); // Logging path mapping for server output.
   const fs = require('fs'); // Native file system module reference.

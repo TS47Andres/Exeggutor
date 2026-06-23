@@ -41,3 +41,8 @@ Thumbs.db
 .exeggutor-worktrees/
 
 *.tgz
+
+# Expo / React Native
+.expo/
+*.tsbuildinfo
+*.hbc

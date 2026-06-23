@@ -9,11 +9,14 @@ import * as crypto from 'crypto';
 import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
+import * as tailscale from './tailscale';
+import { getTerminalHtml } from './terminalHtml';
 
 const PORT = parseInt(process.env.EXEGGUTOR_BACKEND_PORT || '17492', 10); // Backend API port from env or default.
 const FRONTEND_DIST = process.env.EXEGGUTOR_FRONTEND_DIST || ''; // Path to built frontend dist/ folder.
 const configPath = path.resolve(os.homedir(), '.exeggutor.json'); // Path to CLI config file.
 let authToken = process.env.EXEGGUTOR_AUTH_TOKEN || ''; // Active authorization token.
+const TAILSCALE_MODE = process.env.EXEGGUTOR_TAILSCALE === '1'; // Whether to expose the server over Tailscale.
 try {
   if (fs.existsSync(configPath)) {
     const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8')); // Loaded configuration settings.
@@ -23,6 +26,14 @@ try {
   }
 } catch (_) {
   // Safe ignore config load errors.
+}
+
+// Determine the host binding for the server.
+function resolveListenHost(): string {
+  if (TAILSCALE_MODE) {
+    return '0.0.0.0'; // Bind to all interfaces so Tailscale can forward traffic.
+  }
+  return '127.0.0.1'; // Local-only binding for security.
 }
 
 const server: FastifyInstance = fastify({ logger: true }); // Fastify server instance running local services with logging enabled.
@@ -90,6 +101,12 @@ async function bootstrap(): Promise<void> {
       }
     });
   }
+
+  // Serves the self-contained terminal HTML page for the React Native WebView.
+  server.get('/terminal.html', async (request, reply) => {
+    reply.type('text/html');
+    return reply.send(getTerminalHtml());
+  });
 
   pty.startStatusAuditor(broadcastObserverUpdate);
 
@@ -396,6 +413,46 @@ async function bootstrap(): Promise<void> {
     return result;
   });
 
+  // Returns the current Tailscale status and connection info for the server.
+  server.get('/api/tailscale/status', async (request, reply) => {
+    const installed = tailscale.isTailscaleInstalled(); // Whether the tailscale binary exists on PATH.
+    const info = installed ? tailscale.getTailscaleInfo() : null; // Parsed tailscale status, null if not connected.
+    const pairingCode = (info && authToken)
+      ? tailscale.generatePairingCode(info.ip, PORT, authToken, os.hostname())
+      : null; // Pairing string for mobile app, null if tailscale not available.
+    return {
+      installed,
+      connected: info !== null,
+      tailscale: info,
+      tailscaleMode: TAILSCALE_MODE,
+      pairingCode,
+    };
+  });
+
+  // Returns pairing information including a pairing code string and a QR code as a data URL.
+  server.get('/api/pairing/qr', async (request, reply) => {
+    const info = tailscale.getTailscaleInfo(); // Current tailscale state for the local node.
+    if (!info) {
+      reply.status(400);
+      return { error: 'Tailscale is not connected. Ensure tailscale is installed and connected.' };
+    }
+    if (!authToken) {
+      reply.status(500);
+      return { error: 'Auth token not configured. Cannot generate pairing code.' };
+    }
+    const hostname = os.hostname(); // Local machine hostname for display.
+    const code = tailscale.generatePairingCode(info.ip, PORT, authToken, hostname); // Scannable connection string.
+    const qrModule = require('qrcode'); // QR code generation library.
+    const qrDataUrl = await qrModule.toDataURL(code, { width: 400, margin: 2 }); // QR code as a base64 data URL string.
+    return {
+      pairingCode: code,
+      qrDataUrl,
+      hostname,
+      tailscaleIP: info.ip,
+      dnsName: info.dnsName,
+    };
+  });
+
   server.get('/api/browse', async (request, reply) => {
     try {
       const folder = await git.showFolderPicker();
@@ -514,8 +571,16 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  await server.listen({ port: PORT, host: '127.0.0.1' });
-  console.log(`Backend daemon is listening on port ${PORT}`);
+  const listenHost = resolveListenHost(); // Network interface to bind the server to.
+  await server.listen({ port: PORT, host: listenHost });
+  const tailscaleInfo = TAILSCALE_MODE ? tailscale.getTailscaleInfo() : null; // Information about the current Tailscale connection.
+  if (tailscaleInfo) {
+    console.log(`Tailscale URL: http://${tailscaleInfo.ip}:${PORT}`);
+    if (tailscaleInfo.dnsName) {
+      console.log(`Tailscale DNS: https://${tailscaleInfo.dnsName}:${PORT}`);
+    }
+  }
+  console.log(`Backend daemon is listening on port ${PORT} (bound to ${listenHost})`);
 }
 
 bootstrap().catch(err => {
