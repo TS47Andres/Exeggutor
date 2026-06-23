@@ -170,7 +170,7 @@ async function bootstrap(): Promise<void> {
       await Promise.all(
         targetWs.tabs.map(async tab => {
           console.log(`[API] Cleaning up tab ${tab.id} for workspace delete`);
-          pty.killPtySession(tab.id);
+          await pty.killPtySession(tab.id);
           if (tab.worktreePath) {
             try {
               await git.removeGitWorktree(targetWs.path, tab.worktreePath);
@@ -250,7 +250,7 @@ async function bootstrap(): Promise<void> {
 
       if (branch !== undefined && branch !== tab.branch) {
         console.log(`[API] Branch change detected for tab ${tabId}: "${tab.branch}" -> "${branch}", killing PTY`);
-        pty.killPtySession(tabId);
+        await pty.killPtySession(tabId);
         if (tab.worktreePath) {
           try {
             await git.removeGitWorktree(targetWs.path, tab.worktreePath);
@@ -311,7 +311,7 @@ async function bootstrap(): Promise<void> {
       }
       try {
         await git.createBranch(targetWs.path, branchName);
-        pty.killPtySession(tabId);
+        await pty.killPtySession(tabId);
         if (tab.worktreePath) {
           try {
             await git.removeGitWorktree(targetWs.path, tab.worktreePath);
@@ -344,7 +344,7 @@ async function bootstrap(): Promise<void> {
       if (targetWs) {
         const tab = targetWs.tabs.find(t => t.id === tabId); // Target tab config.
         console.log(`[API] Killing PTY and cleaning up worktree for tab ${tabId}`);
-        pty.killPtySession(tabId);
+        await pty.killPtySession(tabId);
         if (tab && tab.worktreePath) {
           try {
             await git.removeGitWorktree(targetWs.path, tab.worktreePath);

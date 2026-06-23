@@ -21,6 +21,7 @@ export interface TerminalSession {
 const sessions = new Map<string, TerminalSession>(); // Global map cache linking tab IDs to their active persistent TerminalSessions.
 let statusCheckInterval: NodeJS.Timeout | null = null; // Background interval reference for running periodic status audits.
 let spawnLock: Promise<void> | null = null; // Mutex promise ensuring only one PTY spawn executes at a time on Windows.
+let killLock: Promise<void> | null = null; // Mutex promise ensuring only one PTY kill executes at a time on Windows.
 
 // Queries the operating system to recursively find all active child and descendant process IDs of the specified parent process.
 function getDescendants(parentPid: number): Promise<Array<{ pid: number; name: string }>> {
@@ -276,28 +277,37 @@ export function resizePtySession(tabId: string, cols: number, rows: number): voi
 }
 
 // Write input data directly to the active terminal process.
+// Does not change the session status — the periodic auditor handles status transitions,
+// preventing rapid Idle↔Active flickering that occurred on every keystroke.
 export function writeToPtySession(tabId: string, data: string): void {
   const session = sessions.get(tabId); // Look up session by ID.
   if (session) {
-    const oldStatus = session.status; // Preserve original status before computation.
-    session.status = 'Idle'; // Set status to Idle immediately when user interacts.
-    if (oldStatus !== session.status && session.broadcastCallback) {
-      session.broadcastCallback();
-    }
     session.ptyProcess.write(data);
   }
 }
 
 // Forces the termination of a terminal session and frees system process resources.
-export function killPtySession(tabId: string): void {
+// Serializes concurrent kills on Windows to avoid overlapping conhost termination window flashes.
+export async function killPtySession(tabId: string): Promise<void> {
   const session = sessions.get(tabId); // Find session by tab ID.
   if (session) {
     console.log(`[PTY] killPtySession(tabId=${tabId}) -> killing PID=${session.ptyProcess.pid}`);
+    // Wait for any in-flight PTY kill to finish before terminating this one to avoid ConPTY conflicts on Windows.
+    while (killLock) {
+      console.log(`[PTY] Kill lock held, waiting for tab=${tabId}`);
+      await killLock;
+    }
+    let releaseKillLock: () => void = () => {}; // Callback to release the kill mutex after termination completes.
+    killLock = new Promise((resolve) => { releaseKillLock = resolve; });
+
     try {
       session.ptyProcess.kill();
       console.log(`[PTY] killPtySession(tabId=${tabId}) -> kill OK`);
     } catch (err: any) {
       console.log(`[PTY] killPtySession(tabId=${tabId}) -> kill error: ${err.message}`);
+    } finally {
+      killLock = null;
+      releaseKillLock();
     }
     try {
       db.updateTerminalTab(session.workspaceId, tabId, { pid: undefined }); // Clear the PID record from the database.
