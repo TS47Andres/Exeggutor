@@ -135,29 +135,4 @@ export function getTailscaleURL(port: number): string | null {
   return null;
 }
 
-// Verifies that the given IP address belongs to a known Tailscale peer by
-// running `tailscale whois`. Returns true if the peer is recognised.
-export function verifyTailscalePeer(peerIP: string): boolean {
-  try {
-    execSync(`"${tailscaleBin()}" whois ${peerIP}`, {
-      stdio: 'ignore',
-      timeout: 5000,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
-// Generates a compact pairing string for the mobile app.
-// Format: "exeggutor://<ip>:<port>?token=<token>&name=<hostname>"
-export function generatePairingCode(
-  ip: string,
-  port: number,
-  token: string,
-  hostname: string
-): string {
-  const encodedToken = encodeURIComponent(token); // Auth token URL-encoded for safe transport.
-  const encodedName = encodeURIComponent(hostname || 'exeggutor'); // Hostname URL-encoded.
-  return `exeggutor://${ip}:${port}?token=${encodedToken}&name=${encodedName}`;
-}

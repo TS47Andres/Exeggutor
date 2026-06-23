@@ -10,7 +10,6 @@ import * as db from './workspaceDb';
 import * as git from './gitWorktree';
 import * as pty from './ptyManager';
 import * as tailscale from './tailscale';
-import { getTerminalHtml } from './terminalHtml';
 
 const PORT = parseInt(process.env.EXEGGUTOR_BACKEND_PORT || '17492', 10); // Backend API port from env or default.
 const FRONTEND_DIST = process.env.EXEGGUTOR_FRONTEND_DIST || ''; // Path to built frontend dist/ folder.
@@ -101,12 +100,6 @@ async function bootstrap(): Promise<void> {
       }
     });
   }
-
-  // Serves the self-contained terminal HTML page for the React Native WebView.
-  server.get('/terminal.html', async (request, reply) => {
-    reply.type('text/html');
-    return reply.send(getTerminalHtml());
-  });
 
   pty.startStatusAuditor(broadcastObserverUpdate);
 
@@ -417,39 +410,11 @@ async function bootstrap(): Promise<void> {
   server.get('/api/tailscale/status', async (request, reply) => {
     const installed = tailscale.isTailscaleInstalled(); // Whether the tailscale binary exists on PATH.
     const info = installed ? tailscale.getTailscaleInfo() : null; // Parsed tailscale status, null if not connected.
-    const pairingCode = (info && authToken)
-      ? tailscale.generatePairingCode(info.ip, PORT, authToken, os.hostname())
-      : null; // Pairing string for mobile app, null if tailscale not available.
     return {
       installed,
       connected: info !== null,
       tailscale: info,
       tailscaleMode: TAILSCALE_MODE,
-      pairingCode,
-    };
-  });
-
-  // Returns pairing information including a pairing code string and a QR code as a data URL.
-  server.get('/api/pairing/qr', async (request, reply) => {
-    const info = tailscale.getTailscaleInfo(); // Current tailscale state for the local node.
-    if (!info) {
-      reply.status(400);
-      return { error: 'Tailscale is not connected. Ensure tailscale is installed and connected.' };
-    }
-    if (!authToken) {
-      reply.status(500);
-      return { error: 'Auth token not configured. Cannot generate pairing code.' };
-    }
-    const hostname = os.hostname(); // Local machine hostname for display.
-    const code = tailscale.generatePairingCode(info.ip, PORT, authToken, hostname); // Scannable connection string.
-    const qrModule = require('qrcode'); // QR code generation library.
-    const qrDataUrl = await qrModule.toDataURL(code, { width: 400, margin: 2 }); // QR code as a base64 data URL string.
-    return {
-      pairingCode: code,
-      qrDataUrl,
-      hostname,
-      tailscaleIP: info.ip,
-      dnsName: info.dnsName,
     };
   });
 

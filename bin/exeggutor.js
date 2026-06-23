@@ -205,24 +205,6 @@ if (first === '--remove-service') {
   return;
 }
 
-// --tailscale-status
-if (first === '--tailscale-status') {
-  cli.tailscaleStatus(CONFIG_PATH).catch(err => {
-    console.error('Failed to get tailscale status:', err.message);
-    process.exit(1);
-  });
-  return;
-}
-
-// --tailscale-pair
-if (first === '--tailscale-pair') {
-  cli.tailscalePair(CONFIG_PATH).catch(err => {
-    console.error('Failed to generate pairing code:', err.message);
-    process.exit(1);
-  });
-  return;
-}
-
 // Unknown command
 console.error(`Unknown command: ${first}`);
 console.error('Run "exeggutor --help" for usage information.');

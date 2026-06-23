@@ -57,10 +57,8 @@ Commands:
   --close <ws-hash> <term-name-or-hash>
                           Close a terminal
 
-  Tailscale:
-  --tailscale             Start with Tailscale remote access enabled
-  --tailscale-status      Show Tailscale connection status
-  --tailscale-pair        Generate a QR pairing code for mobile access
+  Remote Access:
+  --tailscale             Enable remote browser access via Tailscale
 
   Service Management:
   --install-service       Install auto-start on system boot
@@ -414,78 +412,6 @@ async function deleteWorkspace(configPath, wsHash) {
   }
 }
 
-// Queries the backend for tailscale status and prints it to stdout.
-async function tailscaleStatus(configPath) {
-  const config = loadConfig(configPath);
-  const backendPort = config.backendPort || 17492;
-
-  try {
-    const data = await apiGet(backendPort, '/api/tailscale/status');
-    const status = JSON.parse(data); // Parsed tailscale status response from backend.
-    console.log('Tailscale Status');
-    console.log('================\n');
-    console.log(`Installed: ${status.installed}`);
-    console.log(`Connected: ${status.connected}`);
-    console.log(`Tailscale Mode: ${status.tailscaleMode}`);
-    if (status.tailscale) {
-      console.log(`IP: ${status.tailscale.ip}`);
-      console.log(`DNS Name: ${status.tailscale.dnsName}`);
-      console.log(`Tailnet: ${status.tailscale.tailnetName}`);
-      console.log(`Online: ${status.tailscale.online}`);
-    }
-    if (status.pairingCode) {
-      console.log(`\nPairing code available. Run "exeggutor --tailscale-pair" for QR.`);
-    }
-  } catch {
-    console.error('Could not connect to backend. Is it running?');
-    process.exit(1);
-  }
-}
-
-// Generates a QR pairing code for the mobile app and writes a PNG file to the home directory.
-async function tailscalePair(configPath) {
-  const config = loadConfig(configPath);
-  const backendPort = config.backendPort || 17492;
-
-  try {
-    // Start in tailscale mode if not already
-    if (!config.backendPid) {
-      console.log('Exeggutor is not running. Starting with Tailscale mode...');
-      await handleStartServers(resolve(__dirname, '..'), configPath, ['--tailscale']);
-      await new Promise(r => setTimeout(r, 2000)); // Wait for the server to initialize.
-    }
-
-    const raw = await apiGet(backendPort, '/api/pairing/qr');
-    const pairing = JSON.parse(raw); // Parsed pairing response with QR data URL.
-    const qrOutPath = resolve(require('os').homedir(), 'exeggutor-pair.png'); // Output path for the QR code image.
-
-    // Decode the base64 data URL and write it as a PNG file
-    const matches = pairing.qrDataUrl.match(/^data:image\/png;base64,(.+)$/); // Regex extracting the base64 payload from the data URL.
-    if (matches && matches[1]) {
-      const { writeFileSync: writeBuf } = require('fs'); // File system write function for the binary buffer.
-      writeBuf(qrOutPath, Buffer.from(matches[1], 'base64'));
-      console.log(`Pairing QR code saved to: ${qrOutPath}`);
-    } else {
-      console.log(`Pairing URL: ${pairing.pairingCode}`);
-    }
-
-    console.log('');
-    console.log('Setup instructions:');
-    console.log('  1. Install Tailscale on both devices (tailscale.com/download)');
-    console.log('  2. Sign into the same Tailscale account on both');
-    console.log('  3. On your phone, open Exeggutor Mobile and scan this QR code');
-    console.log('  4. The app will connect to this machine over the encrypted tailnet');
-    if (pairing.tailscaleIP) {
-      console.log(`\nOr manually connect to: http://${pairing.tailscaleIP}:${backendPort}`);
-    }
-  } catch (err) {
-    console.error('Failed to generate pairing code:', err.message);
-    console.error('Ensure Tailscale is installed and connected.');
-    console.error('Run "exeggutor --tailscale" first, then try again.');
-    process.exit(1);
-  }
-}
-
 // Installs auto-start service.
 async function installAutostart(root) {
   const autostartModule = require('./autostart');
@@ -671,6 +597,5 @@ module.exports = {
   deleteWorkspace,
   installAutostart,
   removeAutostart,
-  tailscaleStatus,
-  tailscalePair,
+
 };
