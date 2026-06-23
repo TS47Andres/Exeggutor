@@ -418,7 +418,7 @@ function App() {
     const gridLayout = (
       <div className="flex-1 flex flex-col min-h-0 bg-dark-900">
         {activeWorkspace.tabs.length > 0 && (
-          <div className="px-6 py-3 border-b border-dark-700/60 flex items-center justify-between shrink-0">
+          <div className="hidden lg:flex px-6 py-3 border-b border-dark-700/60 items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-white" />
               <span className="text-sm font-semibold text-slate-300">Terminal Shell Grid</span>
