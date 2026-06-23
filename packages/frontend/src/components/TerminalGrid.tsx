@@ -266,6 +266,14 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
   const tabMap = new Map(tabs.map(t => [t.id, t])); // HashMap optimization mapping tab IDs to their configurations.
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null); // Active tab ID being renamed.
   const [renameValue, setRenameValue] = useState(''); // Text input value for the tab rename field.
+  const [focusedTabId, setFocusedTabId] = useState<string | null>(null); // Currently focused terminal tab ID.
+
+  // Auto-focus the first tab when tabs change and the focused tab is no longer present.
+  useEffect(() => {
+    if (tabs.length > 0 && (!focusedTabId || !tabMap.has(focusedTabId))) {
+      setFocusedTabId(tabs[0].id);
+    }
+  }, [tabs, focusedTabId, tabMap]);
 
   const MAX_TABS = 4; // Maximum terminal tabs allowed per workspace.
   const atTabLimit = tabs.length >= MAX_TABS; // Flag indicating the tab limit has been reached.
@@ -308,11 +316,12 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
       setRenamingTabId(id);
     }; // Activates the custom rename modal.
 
+    const isFocused = id === focusedTabId; // Flag indicating this tab is the currently focused terminal.
     const tileView = (
       <MosaicWindow<string>
         path={path}
         title={tabData.name}
-        className="group"
+        className={`group${isFocused ? ' mosaic-window-focused' : ''}`}
         toolbarControls={[
           branchSelector,
           <div key="toolbar-actions" className="flex items-center gap-1 ml-1">
@@ -352,7 +361,13 @@ export const TerminalGrid: React.FC<TerminalGridProps> = ({
           </div>,
         ].filter(Boolean) as React.ReactNode[]}
       >
-        <TerminalTab key={`${id}-${tabData.branch || ''}`} workspaceId={workspaceId} tabId={id} isActive={true} />
+        <TerminalTab
+          key={`${id}-${tabData.branch || ''}`}
+          workspaceId={workspaceId}
+          tabId={id}
+          isActive={isFocused}
+          onFocus={() => setFocusedTabId(id)}
+        />
       </MosaicWindow>
     ); // The rendered tile with toolbars.
     return tileView;

@@ -6,10 +6,11 @@ interface TerminalTabProps {
   workspaceId: string; // The ID of the parent workspace owning the tab.
   tabId: string; // The unique ID of this terminal session tab.
   isActive: boolean; // Flag to indicate if this terminal window is currently focused.
+  onFocus?: () => void; // Callback invoked when the terminal is clicked to request focus.
 }
 
 // Renders an xterm.js instance and binds it to a persistent backend shell process.
-export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive }) => {
+export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, isActive, onFocus }) => {
   const [ready, setReady] = useState(false); // Tracks if the container has non-zero dimensions.
   const containerRef = useRef<HTMLDivElement>(null); // Reference mapping to the DOM element hosting the xterm frame.
   const termRef = useRef<Terminal | null>(null); // Reference containing the instantiated xterm terminal engine.
@@ -178,7 +179,7 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
       <div
         ref={containerRef}
         className="absolute inset-0 w-full h-full bg-dark-900"
-        onClick={() => termRef.current?.focus()}
+        onClick={() => { termRef.current?.focus(); onFocus?.(); }}
       />
     </div>
   ); // The main layout representation.
