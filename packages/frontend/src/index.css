@@ -85,13 +85,10 @@
 }
 
 /* xterm.js theme tweaks */
-.xterm {
-  touch-action: pan-y;
-}
 
 .xterm-viewport {
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
   touch-action: pan-y;
