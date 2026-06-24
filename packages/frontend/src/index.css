@@ -86,9 +86,9 @@
 
 /* xterm.js theme tweaks */
 
-.xterm-viewport {
-  overflow-y: auto;
-  overflow-x: hidden;
+.xterm .xterm-viewport {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   scrollbar-width: thin;
   scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
   touch-action: pan-y;
