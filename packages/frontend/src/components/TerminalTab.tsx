@@ -108,22 +108,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
     term.focus();
     sendResize();
 
-    const wheelHandler = (ev: WheelEvent) => {
-      if (term.buffer.active.type !== 'alternate') return;
-      if (ev.deltaY === 0) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      const amount = Math.max(1, Math.min(Math.round(Math.abs(ev.deltaY) / 20), 10));
-      const seq = `\x1b[${ev.deltaY < 0 ? 'A' : 'B'}`;
-      let data = '';
-      for (let i = 0; i < amount; i++) data += seq;
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data }));
-      }
-    };
-    const termEl = term.element;
-    termEl?.addEventListener('wheel', wheelHandler, { capture: true, passive: false });
-
     ws.onmessage = (event) => {
       if (!disposedRef.current) {
         try {
@@ -148,7 +132,6 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ workspaceId, tabId, is
 
     const cleanup = () => {
       disposedRef.current = true;
-      termEl?.removeEventListener('wheel', wheelHandler, { capture: true });
       resizeObserver.disconnect();
       ws.onopen = null;
       ws.onclose = null;
