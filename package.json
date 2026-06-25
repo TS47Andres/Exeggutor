@@ -1,8 +1,9 @@
 {
-  "name": "exeggutor",
+  "name": "@ts47andres/exeggutor",
   "version": "1.1.2",
   "description": "Terminal Multiplexer & Git Worktree Manager - local-first workspace coordinator",
   "private": false,
+  "license": "Apache-2.0",
   "bin": {
     "exeggutor": "./bin/exeggutor.js"
   },
@@ -27,6 +28,24 @@
     "fastify": "^4.28.1",
     "node-pty": "^1.1.0-beta21"
   },
+  "keywords": [
+    "terminal",
+    "multiplexer",
+    "git",
+    "worktree",
+    "workspace",
+    "tui",
+    "dev-tools",
+    "productivity"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TS47Andres/Exeggutor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TS47Andres/Exeggutor/issues"
+  },
+  "homepage": "https://github.com/TS47Andres/Exeggutor#readme",
   "files": [
     "bin/",
     "src/",
@@ -38,6 +57,7 @@
     "packages/backend/native/",
     "packages/backend/src/",
     "packages/frontend/package.json",
-    "packages/frontend/dist/"
+    "packages/frontend/dist/",
+    "LICENSE"
   ]
 }

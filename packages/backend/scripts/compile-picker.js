@@ -2,6 +2,11 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// FolderPicker is Windows-only; skip silently on other platforms.
+if (process.platform !== 'win32') {
+  process.exit(0);
+}
+
 const SOURCE = path.join(__dirname, '..', 'native', 'FolderPicker.cs'); // Path to the C# source file.
 const OUTPUT = path.join(__dirname, '..', 'bin', 'FolderPicker.exe'); // Output path for the compiled binary.
 

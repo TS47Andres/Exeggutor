@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-339933?logo=node.js&logoColor=white" alt="Node">
   <img src="https://img.shields.io/badge/typescript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/react-61DAFB?logo=react&logoColor=black" alt="React">
-  <img src="https://img.shields.io/badge/license-MIT-yellow" alt="License">
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License">
 </p>
 
 ---
@@ -111,7 +111,7 @@ Responsive layout with a slide-out sidebar drawer and single-terminal tabbed vie
 
 ```bash
 # Install globally
-npm install -g exeggutor
+npm install -g @ts47andres/exeggutor
 
 # Start the dashboard
 exeggutor
