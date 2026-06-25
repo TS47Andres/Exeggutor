@@ -5,7 +5,7 @@
   "private": false,
   "license": "Apache-2.0",
   "bin": {
-    "exeggutor": "./bin/exeggutor.js"
+    "exeggutor": "bin/exeggutor.js"
   },
   "scripts": {
     "dev": "node bin/exeggutor.js",
