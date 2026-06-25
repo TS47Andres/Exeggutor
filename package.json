@@ -1,6 +1,6 @@
 {
   "name": "@ts47andres/exeggutor",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Terminal Multiplexer & Git Worktree Manager - local-first workspace coordinator",
   "private": false,
   "license": "Apache-2.0",
@@ -12,7 +12,7 @@
     "dev:backend": "cd packages/backend && npm run dev",
     "dev:frontend": "cd packages/frontend && npm run dev",
     "build": "cd packages/backend && npm run build && cd ../.. && cd packages/frontend && npm run build",
-    "postinstall": "node packages/backend/scripts/compile-picker.js && (chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true)",
+    "postinstall": "node packages/backend/scripts/compile-picker.js",
     "prepublishOnly": "npm run build",
     "status": "node bin/exeggutor.js --status",
     "stop": "node bin/exeggutor.js --stop",

@@ -2,6 +2,22 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// On macOS, ensure the node-pty spawn helper has execute permissions.
+if (process.platform === 'darwin') {
+  const glob = require('glob');
+  const helpers = glob.sync('node_modules/node-pty/prebuilds/darwin-*/spawn-helper', {
+    cwd: path.join(__dirname, '..', '..', '..'),
+  });
+  for (const h of helpers) {
+    try {
+      fs.chmodSync(h, 0o755);
+    } catch {
+      // non-critical
+    }
+  }
+  process.exit(0);
+}
+
 // FolderPicker is Windows-only; skip silently on other platforms.
 if (process.platform !== 'win32') {
   process.exit(0);
